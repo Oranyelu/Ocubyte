@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html.theme-glass {
+  background: linear-gradient(120deg, #a1c4fd, #c2e9fb);
+  animation: cloudDrift 60s ease infinite;
+  background-size: 300% 300%;
+  color: white;
+}
+
+html.theme-light {
+  background: linear-gradient(to bottom right, #f0faff, #e8f0ff);
+  color: #002855;
+}
+
+html.theme-dark {
+  background: #111827;
+  color: white;
+}
+
+.glass-panel {
+  @apply backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl shadow-lg;
+}
