@@ -1,32 +1,36 @@
-// src/pages/ProjectsPage.jsx
-import ProjectCard from "../components/ProjectCard";
+import React from 'react';
+import ProjectCard from '../components/ProjectCard';
 
+// Replace with your actual project data
 const projects = [
   {
-    title: "Maison Jorgie",
-    description: "Luxury fashion e-commerce app built with React Native.",
-    tags: ["App", "E-commerce"],
-    image: "/images/jorgie.png",
+    name: 'Project One',
+    description: 'A brief description of the project.',
+    imageUrl: 'https://via.placeholder.com/400x200',
+    link: '#',
   },
   {
-    title: "George Wood Casket",
-    description: "Legacy-driven funeral home website redesign.",
-    tags: ["Branding", "Website"],
-    image: "/images/gwc.png",
+    name: 'Project Two',
+    description: 'A brief description of the project.',
+    imageUrl: 'https://via.placeholder.com/400x200',
+    link: '#',
   },
-  // ...more
+  // Add more projects as needed
 ];
 
-export default function ProjectsPage() {
+const ProjectsPage = () => {
   return (
-    <section className="px-6 py-16 max-w-6xl mx-auto">
-      <h1 className="text-4xl font-bold text-center mb-12">Our Work</h1>
-
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        {projects.map((proj, i) => (
-          <ProjectCard key={i} {...proj} />
+    <div className="min-h-screen p-8">
+      <h1 className="mb-8 text-center text-4xl font-bold md:text-6xl">
+        Our <span className="text-ocubyte-accent">Projects</span>
+      </h1>
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {projects.map((project, index) => (
+          <ProjectCard key={index} project={project} />
         ))}
       </div>
-    </section>
+    </div>
   );
-}
+};
+
+export default ProjectsPage;

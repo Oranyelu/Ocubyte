@@ -2,23 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-html.theme-glass {
-  background: linear-gradient(120deg, #a1c4fd, #c2e9fb);
-  animation: cloudDrift 60s ease infinite;
-  background-size: 300% 300%;
-  color: white;
+.theme-ocubyte-dark {
+  --color-primary: #0A1018;
+  --color-secondary: #1a202c;
+  --color-accent: #F59E0B;
+  --color-text: #E5E7EB;
 }
 
-html.theme-light {
-  background: linear-gradient(to bottom right, #f0faff, #e8f0ff);
-  color: #002855;
+.theme-ocubyte-light {
+  --color-primary: #E5E7EB;
+  --color-secondary: #ffffff;
+  --color-accent: #00B7EF;
+  --color-text: #0A1018;
 }
 
-html.theme-dark {
-  background: #111827;
-  color: white;
+.theme-glass {
+  --color-primary: transparent;
+  --color-secondary: rgba(255, 255, 255, 0.1);
+  --color-accent: #00FFAB;
+  --color-text: #E5E7EB;
 }
 
-.glass-panel {
-  @apply backdrop-blur-xl bg-white/10 border border-white/10 rounded-xl shadow-lg;
+@keyframes move-bg {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+body {
+  background-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.theme-glass body {
+  background: linear-gradient(45deg, #0A1018, #00B7EF, #00FFAB, #FF5E57);
+  background-size: 400% 400%;
+  animation: move-bg 15s ease-in-out infinite;
 }

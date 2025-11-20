@@ -1,34 +1,35 @@
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
-import { createContext, useContext, useEffect, useState } from "react"
+const ThemeContext = createContext();
 
-const ThemeContext = createContext()
+export const useTheme = () => useContext(ThemeContext);
 
-const themes = ["glass", "light", "dark"]
-
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("theme") || "glass"
-  })
-
-  useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove(...themes.map(t => `theme-${t}`))
-    root.classList.add(`theme-${theme}`)
-    localStorage.setItem("theme", theme)
-  }, [theme])
+export const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState('dark'); // 'dark', 'light', 'glass'
 
   const cycleTheme = () => {
-    const next = (themes.indexOf(theme) + 1) % themes.length
-    setTheme(themes[next])
-  }
+    setTheme(prevTheme => {
+      if (prevTheme === 'dark') return 'light';
+      if (prevTheme === 'light') return 'glass';
+      return 'dark';
+    });
+  };
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('theme-ocubyte-dark', 'theme-ocubyte-light', 'theme-glass');
+    if (theme === 'dark') {
+      root.classList.add('theme-ocubyte-dark');
+    } else if (theme === 'light') {
+      root.classList.add('theme-ocubyte-light');
+    } else {
+      root.classList.add('theme-glass');
+    }
+  }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, cycleTheme }}>
+    <ThemeContext.Provider value={{ theme, cycleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
-  )
-}
-
-export function useTheme() {
-  return useContext(ThemeContext)
-}
+  );
+};

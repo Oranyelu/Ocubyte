@@ -1,7 +1,15 @@
-const GlassCard = ({ title, children }) => {
+import React from 'react';
+import { cn } from '../utils/cn';
+
+const GlassCard = ({ children, className }) => {
   return (
-    <div className="backdrop-blur-2xl bg-white/10 border border-white/10 rounded-xl p-6 shadow-lg text-white">
-      <h2 className="text-lg font-semibold mb-2">{title}</h2>
+    <div
+      className={cn(
+        'rounded-2xl border border-white/10 bg-white/5 p-8 shadow-lg backdrop-blur-md',
+        'transition-all duration-300 ease-in-out hover:shadow-2xl hover:bg-white/10',
+        className
+      )}
+    >
       {children}
     </div>
   );

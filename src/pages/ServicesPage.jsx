@@ -1,41 +1,50 @@
-import ServiceCard from "../components/ServiceCard"
-import { Paintbrush, Code, Sparkles, Database } from "lucide-react"
+import React from 'react';
+import { motion } from 'framer-motion';
+import GlassCard from '../components/GlassCard';
+import { FaCode, FaPaintBrush, FaRocket } from 'react-icons/fa';
 
 const services = [
   {
-    title: "Product Design & Branding",
-    description: "We help startups stand out with unforgettable visuals and powerful brand messaging.",
-    icon: Paintbrush,
+    icon: <FaCode className="h-12 w-12 text-ocubyte-accent" />,
+    title: 'Smart Systems',
+    description: 'We build robust and scalable systems tailored to your business needs.',
   },
   {
-    title: "Web & Mobile Development",
-    description: "Full-stack magic — built for performance, elegance, and scale.",
-    icon: Code,
+    icon: <FaPaintBrush className="h-12 w-12 text-ocubyte-accent" />,
+    title: 'Bold Identities',
+    description: 'We create unique and memorable brand identities that stand out.',
   },
   {
-    title: "Content Automation",
-    description: "We automate your online presence so you can focus on being iconic.",
-    icon: Sparkles,
+    icon: <FaRocket className="h-12 w-12 text-ocubyte-accent" />,
+    title: 'Seamless Experiences',
+    description: 'We design intuitive and engaging digital experiences for your users.',
   },
-  {
-    title: "Enterprise Systems",
-    description: "Custom tools and databases to power your operations behind the scenes.",
-    icon: Database,
-  },
-]
+];
 
-export default function ServicesPage () {
+const ServicesPage = () => {
   return (
-    <section className="px-6 py-20 max-w-7xl mx-auto text-center">
-      <h1 className="text-4xl font-bold mb-4">What We Do</h1>
-      <p className="text-white/60 max-w-xl mx-auto mb-10">
-        Ocubyte is your digital pit crew — we design, build, and automate your business from the ground up.
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {services.map((s, i) => (
-          <ServiceCard key={i} {...s} />
+    <div className="min-h-screen p-8">
+      <h1 className="mb-8 text-center text-4xl font-bold md:text-6xl">
+        What We <span className="text-ocubyte-accent">Do</span>
+      </h1>
+      <div className="grid gap-8 md:grid-cols-3">
+        {services.map((service, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: index * 0.2 }}
+          >
+            <GlassCard className="text-center">
+              <div className="mb-4 inline-block">{service.icon}</div>
+              <h2 className="text-2xl font-bold">{service.title}</h2>
+              <p className="mt-2">{service.description}</p>
+            </GlassCard>
+          </motion.div>
         ))}
       </div>
-    </section>
-  )
-}
+    </div>
+  );
+};
+
+export default ServicesPage;

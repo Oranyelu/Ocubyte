@@ -1,28 +1,20 @@
-// src/pages/AboutPage.jsx
-export default function AboutPage() {
+import React from 'react';
+import GlassCard from '../components/GlassCard';
+
+const AboutPage = () => {
   return (
-    <section className="space-y-12 px-6 py-16 max-w-4xl mx-auto text-center">
-      <h1 className="text-4xl font-bold tracking-tight">Who We Are</h1>
-
-      <p className="text-lg opacity-80">
-        Ocubyte is a digital product studio that helps visionary brands create,
-        automate, and scale smarter.
-      </p>
-
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">What Drives Us?</h2>
-        <p className="opacity-70">
-          We believe that tech should feel like magic. That every line of code
-          should carry meaning. That design isn’t just aesthetic — it’s a language.
+    <div className="container mx-auto px-4">
+      <GlassCard>
+        <h1 className="text-4xl font-bold mb-4">About Ocubyte</h1>
+        <p className="text-lg">
+          Ocubyte is a forward-thinking technology company dedicated to creating innovative solutions for the modern world. We specialize in building beautiful, functional, and user-friendly applications that push the boundaries of what's possible.
         </p>
-      </div>
-
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">We Byte Hard.</h2>
-        <p className="opacity-70">
-          It’s not just our mantra — it’s how we build. With grit, heart, and a touch of rebellion.
+        <p className="text-lg mt-4">
+          Our team of expert developers and designers is passionate about crafting exceptional user experiences. We believe in the power of technology to transform businesses and lives, and we're committed to helping our clients achieve their goals.
         </p>
-      </div>
-    </section>
+      </GlassCard>
+    </div>
   );
-}
+};
+
+export default AboutPage;

@@ -1,22 +1,27 @@
-// src/components/ProjectCard.jsx
-export default function ProjectCard({ title, description, tags, image }) {
+import React from 'react';
+import { motion } from 'framer-motion';
+import GlassCard from './GlassCard';
+import Button from './Button';
+
+const ProjectCard = ({ project }) => {
   return (
-    <div className="rounded-xl overflow-hidden shadow-md backdrop-blur bg-white/10 border border-white/20 transition hover:scale-[1.02] hover:shadow-xl">
-      <img src={image} alt={title} className="w-full h-40 object-cover" />
-      <div className="p-4">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-white/70">{description}</p>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {tags.map((tag, i) => (
-            <span
-              key={i}
-              className="text-xs bg-ocubyte-accent/10 text-ocubyte-accent px-2 py-0.5 rounded"
-            >
-              {tag}
-            </span>
-          ))}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <GlassCard className="overflow-hidden">
+        <img src={project.imageUrl} alt={project.name} className="h-48 w-full object-cover" />
+        <div className="p-6">
+          <h3 className="text-2xl font-bold">{project.name}</h3>
+          <p className="mt-2 text-gray-400">{project.description}</p>
+          <div className="mt-4">
+            <Button onClick={() => window.open(project.link, '_blank')}>View Project</Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </GlassCard>
+    </motion.div>
   );
-}
+};
+
+export default ProjectCard;

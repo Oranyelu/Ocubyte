@@ -1,14 +1,18 @@
-// src/pages/NotFound.jsx
-import { Link } from "react-router-dom";
+import React from 'react';
+import { Link } from 'react-router-dom';
+import Button from '../components/Button';
 
-export default function NotFound() {
+const NotFound = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center text-white p-8">
-      <h1 className="text-6xl font-extrabold mb-4">404</h1>
-      <p className="text-lg mb-6">Oops, you just byte into a void.</p>
-      <Link to="/" className="underline text-ocubyte-accent hover:text-white">
-        Return to Home
+    <div className="flex h-screen flex-col items-center justify-center">
+      <h1 className="text-9xl font-bold text-ocubyte-accent">404</h1>
+      <h2 className="mt-4 text-4xl font-medium">Page Not Found</h2>
+      <p className="mt-2 text-lg">The page you are looking for does not exist.</p>
+      <Link to="/" className="mt-8">
+        <Button>Go Home</Button>
       </Link>
     </div>
   );
-}
+};
+
+export default NotFound;

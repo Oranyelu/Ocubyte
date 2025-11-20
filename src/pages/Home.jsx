@@ -1,22 +1,27 @@
-import Hero from "../components/Hero"
-import Services from "../components/Services"
-import Features from "../components/Features"
-import CTA from "../components/CTA"
-import GlassPanel from "../components/GlassPanel"
+import React from 'react';
+import { Link } from 'react-router-dom';
+import Button from '../components/Button';
+import { motion } from 'framer-motion'; // Assuming framer-motion is installed
 
-export default function Home() {
+const Home = () => {
   return (
-    <div className="space-y-20">
-      <Hero />
-
-      {/* Optional: Only show this on Glass theme */}
-      <GlassPanel title="We Byte Hard" subtitle="Code that feels. Powered by AI. Built for humans.">
-        <p className="text-sm text-white/70">Context-aware systems. Seamless automation. Built with empathy.</p>
-      </GlassPanel>
-
-      <Services />
-      <Features />
-      <CTA />
+    <div className="flex h-screen items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+        className="text-center"
+      >
+        <h1 className="text-6xl font-bold md:text-8xl">
+          <span className="animate-neon-flicker text-ocubyte-accent">Ocu</span>byte
+        </h1>
+        <p className="mt-4 text-xl md:text-2xl">Creative Product Studio</p>
+        <Link to="/about" className="mt-8 inline-block">
+          <Button>Learn More</Button>
+        </Link>
+      </motion.div>
     </div>
-  )
-}
+  );
+};
+
+export default Home;
