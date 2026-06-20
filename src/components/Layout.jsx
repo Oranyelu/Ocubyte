@@ -1,11 +1,8 @@
 import React from 'react';
-import { useTheme } from '../context/ThemeContext';
-import Button from './Button';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
 const Layout = ({ children }) => {
-  const { cycleTheme } = useTheme();
 
   return (
     <div className="min-h-screen flex flex-col">
