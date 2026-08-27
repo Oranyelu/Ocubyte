@@ -45,9 +45,6 @@ const Navbar = () => {
             alt="Ocubyte Logo" 
             className="h-9 w-auto transition-transform duration-500 group-hover:scale-110" 
           />
-          <span className="text-2xl font-extrabold tracking-wider bg-gradient-to-r from-text via-accent to-text bg-clip-text text-transparent">
-            Ocubyte
-          </span>
         </Link>
 
         {/* Desktop Menu */}

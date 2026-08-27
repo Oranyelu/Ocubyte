@@ -12,8 +12,10 @@ const Footer = () => {
         theme === 'glass' ? 'bg-white/5 backdrop-blur-md' : 'bg-secondary'
       )}
     >
-      <div className="container mx-auto text-center text-text">
-        <p>&copy; {new Date().getFullYear()} Ocubyte. All rights reserved.</p>
+      <div className="container mx-auto text-center text-text flex flex-row flex-wrap justify-center items-center gap-x-3 text-sm">
+        <span>&copy; {new Date().getFullYear()} Ocubyte. All rights reserved.</span>
+        <span className="text-muted font-light">|</span>
+        <span className="text-muted font-mono">RC - 9677104</span>
       </div>
     </footer>
   );

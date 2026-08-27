@@ -12,53 +12,69 @@ import {
   ArrowUpRight,
   ExternalLink,
   Code,
-  Tag
+  Tag,
+  Users,
+  Shield,
+  Building,
+  Trees,
+  Boxes
 } from 'lucide-react';
 
 const projectsData = [
   {
     id: 1,
-    name: 'Mosaik Platform',
-    category: 'branding',
-    description: 'We created a bold, geometric visual identity, custom typography assets, and built a custom portfolio web application to showcase and manage fine-art bookings.',
-    outcome: 'Generated $20,000+ in client bookings in the first 30 days post-launch with a 3.4% site conversion rate.',
-    client: 'Mosaik Creative Studio',
-    tech: ['Branding', 'Typography', 'React', 'Tailwind', 'Supabase'],
-    accentColor: 'from-violet-500 to-fuchsia-600',
-    icon: <Palette className="h-5 w-5 text-violet-400" />
+    name: 'Ogbako Community Platform',
+    category: 'development',
+    description: 'Designed and built a multi-tenant membership platform. The platform features automated dues tracking, secure member directories, custom financial reporting dashboards, and an engagement feed.',
+    outcome: 'Supported 500+ active communities and automated the collection and verification of over $2M in group dues.',
+    client: 'Ogbako',
+    tech: ['React', 'Next.js', 'Tailwind', 'Supabase', 'PostgreSQL'],
+    accentColor: 'bg-[#082822]',
+    icon: <Boxes className="h-5 w-5 text-[#3ecf8e]" />
   },
   {
     id: 2,
-    name: 'Apex Dispatch Hub',
-    category: 'automation',
-    description: 'We automated operational logistics workflows. The system syncs sales data, schedules dispatch routes, and instantly alerts drivers and customers via automated WhatsApp and SMS messages.',
-    outcome: 'Saved the client 25 hours per week of manual data entry and reduced driver dispatch errors to near zero.',
-    client: 'Apex Logistics',
-    tech: ['Automated Systems', 'Twilio API', 'Stripe Hook', 'Node.js', 'PostgreSQL'],
-    accentColor: 'from-cyan-500 to-blue-600',
-    icon: <Cpu className="h-5 w-5 text-cyan-400" />
+    name: 'Riseborough Booking Hub',
+    category: 'development',
+    description: 'Developed a luxury accommodation booking platform. Features seamless payment processing, calendar synchronization for serviced short-lets, and integration with local systems.',
+    outcome: 'Enabled 24/7 online reservations with real-time room availability, leading to a 35% increase in occupancy.',
+    client: 'Riseborough Apartments',
+    tech: ['React', 'Tailwind CSS', 'Stripe', 'Node.js', 'Vercel'],
+    accentColor: 'bg-[#135B3A]',
+    icon: <Building className="h-5 w-5 text-emerald-300" />
   },
   {
     id: 3,
-    name: 'VibeSync Content Hub',
-    category: 'social',
-    description: 'We designed social templates, crafted copy style guides, and built an automated calendar sync that drafts and publishes visual content on LinkedIn, Instagram, and Twitter.',
-    outcome: 'Increased LinkedIn and Instagram organic impression metrics by 140% over a 30-day period.',
-    client: 'VibeSync Inc.',
-    tech: ['Social Media', 'Content Strategy', 'Brand Assets', 'Automation Builder'],
-    accentColor: 'from-rose-500 to-orange-600',
-    icon: <Share2 className="h-5 w-5 text-rose-400" />
+    name: 'CareerPath Dashboard',
+    category: 'automation',
+    description: 'Engineered a premium medical onboarding and credential verification dashboard. Automates profile verification, cover letter customization, and direct routing to partner hospital recruitment systems.',
+    outcome: 'Successfully verified and placed 3,500+ healthcare specialists globally, reducing onboarding lag by 60%.',
+    client: 'Global Care Pathways',
+    tech: ['Next.js', 'Paystack API', 'Supabase', 'Node.js'],
+    accentColor: 'bg-[#2563eb]',
+    icon: <Shield className="h-5 w-5 text-blue-200" />
   },
   {
     id: 4,
-    name: 'Aetheria Booking App',
+    name: 'Premium Funeral E-commerce',
     category: 'development',
-    description: 'We designed a complete corporate identity and engineered a custom, high-speed multi-lingual booking system allowing luxury properties to list and capture high-value reservations.',
-    outcome: 'Successfully launched a booking portal handling up to 10,000 active users with under 100ms API response latency.',
-    client: 'Aetheria Estates',
-    tech: ['Websites & Apps', 'Brand Logos', 'React Router', 'Express API', 'Redis'],
-    accentColor: 'from-emerald-500 to-teal-600',
-    icon: <Globe className="h-5 w-5 text-emerald-400" />
+    description: 'Developed a high-end e-commerce showcase for a premium casket manufacturer and funeral services organization established in 1984. Features structured product sheets and request routing.',
+    outcome: 'Digitalized their catalog structure, serving customers across Nigeria and boosting request volume by 45%.',
+    client: 'George Wood Casket',
+    tech: ['React', 'Tailwind', 'Vite', 'PWA', 'Netlify'],
+    accentColor: 'bg-[#135B3A]',
+    icon: <Trees className="h-5 w-5 text-green-300" />
+  },
+  {
+    id: 5,
+    name: 'OBEAG Tracker & Portal',
+    category: 'automation',
+    description: 'Developed a members\' dashboard and financial contribution tracker. Automates invoice reconciliation, tracking of annual group dues, and SMS member notifications.',
+    outcome: 'Replaced physical paper ledger books, achieving 100% database transparency for membership contributions.',
+    client: 'OHA BU ENYI AGE GRADE',
+    tech: ['Next.js', 'Tailwind', 'Twilio SMS API', 'PostgreSQL'],
+    accentColor: 'bg-[#1e40af]',
+    icon: <Users className="h-5 w-5 text-blue-300" />
   }
 ];
 
@@ -112,7 +128,7 @@ const ProjectsPage = () => {
             >
               <GlassCard className="h-full p-0 overflow-hidden flex flex-col justify-between group hover:border-accent/35">
                 {/* Styled CSS/SVG Artwork Card Header */}
-                <div className={`relative h-48 bg-gradient-to-tr ${project.accentColor} p-6 flex flex-col justify-between overflow-hidden`}>
+                <div className={`relative h-48 ${project.accentColor} p-6 flex flex-col justify-between overflow-hidden`}>
                   <div className="absolute inset-0 bg-grid-white/[0.04] bg-[size:20px_20px]" />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(0,0,0,0.55)_100%)]" />
                   

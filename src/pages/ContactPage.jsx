@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
-import { 
-  Check, 
-  ArrowRight, 
-  ArrowLeft, 
-  Sparkles, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Mail,
+  Phone,
+  MapPin,
   MessageSquare,
   Building,
   User,
@@ -119,19 +119,17 @@ const ContactPage = () => {
                         <div
                           key={opt.id}
                           onClick={() => toggleService(opt.id)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex justify-between items-center ${
-                            isSelected 
-                              ? 'border-accent bg-accent/5' 
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex justify-between items-center ${isSelected
+                              ? 'border-accent bg-accent/5'
                               : 'border-slate-200/30 dark:border-slate-800/30 bg-slate-200/5 dark:bg-slate-900/5 hover:border-accent/35'
-                          }`}
+                            }`}
                         >
                           <div className="space-y-0.5 pr-4">
                             <h4 className="text-xs font-bold">{opt.label}</h4>
                             <p className="text-[10px] text-muted leading-tight">{opt.desc}</p>
                           </div>
-                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                            isSelected ? 'bg-accent border-accent text-white' : 'border-slate-400 dark:border-slate-700'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-accent border-accent text-white' : 'border-slate-400 dark:border-slate-700'
+                            }`}>
                             {isSelected && <Check size={12} className="stroke-[3]" />}
                           </div>
                         </div>
@@ -245,11 +243,10 @@ const ContactPage = () => {
                             type="button"
                             key={u}
                             onClick={() => setFormData(prev => ({ ...prev, urgency: u }))}
-                            className={`py-2 px-3 rounded-lg border text-xs font-bold capitalize transition-all ${
-                              formData.urgency === u 
-                                ? 'border-accent bg-accent/5 text-accent' 
+                            className={`py-2 px-3 rounded-lg border text-xs font-bold capitalize transition-all ${formData.urgency === u
+                                ? 'border-accent bg-accent/5 text-accent'
                                 : 'border-slate-200/30 dark:border-slate-800/30 text-muted'
-                            }`}
+                              }`}
                           >
                             {u}
                           </button>
@@ -320,7 +317,7 @@ const ContactPage = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-muted uppercase font-bold">Client Support</p>
-                  <p className="text-text/90">hello@ocubyte.com</p>
+                  <p className="text-text/90">ocubyte@gmail.com</p>
                 </div>
               </div>
 
@@ -330,7 +327,7 @@ const ContactPage = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-muted uppercase font-bold">General Inquiry</p>
-                  <p className="text-text/90">+1 (415) 555-0198</p>
+                  <p className="text-text/90">+234 912 361 4202</p>
                 </div>
               </div>
 
@@ -340,7 +337,17 @@ const ContactPage = () => {
                 </div>
                 <div>
                   <p className="text-[10px] text-muted uppercase font-bold">HQ Location</p>
-                  <p className="text-text/90">San Francisco, California</p>
+                  <p className="text-text/90">Abuja, Federal Capital Territory, Nigeria.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3.5 p-3 rounded-xl border border-slate-200/30 dark:border-slate-800/30 bg-slate-200/5 dark:bg-slate-900/5">
+                <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20 text-accent">
+                  <Building size={16} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted uppercase font-bold">CAC Registration</p>
+                  <p className="text-text/90">RC - 9677104</p>
                 </div>
               </div>
             </div>

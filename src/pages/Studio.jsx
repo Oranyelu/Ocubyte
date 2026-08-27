@@ -19,8 +19,8 @@ import {
 const studioStyles = {
   cyberpunk: {
     name: 'Neon Cyberpunk',
-    bg: 'from-violet-950 via-fuchsia-950 to-slate-950',
-    cardBg: 'bg-black/80 border-fuchsia-500/30 text-white',
+    bg: 'bg-[#120524]',
+    cardBg: 'bg-black border-fuchsia-500/30 text-white',
     font: 'font-mono uppercase font-black tracking-widest text-fuchsia-400 drop-shadow-[0_0_10px_rgba(217,70,239,0.5)]',
     colors: ['#D946EF', '#06B6D4', '#0F172A'],
     tagline: 'DIGITAL FRONTIER LOGISTICS',
@@ -28,8 +28,8 @@ const studioStyles = {
   },
   luxury: {
     name: 'Luxury Serif',
-    bg: 'from-zinc-900 via-amber-950 to-neutral-900',
-    cardBg: 'bg-stone-950/80 border-amber-500/20 text-stone-100',
+    bg: 'bg-[#1C1917]',
+    cardBg: 'bg-stone-900 border-amber-500/20 text-stone-100',
     font: 'font-serif italic font-light tracking-wide text-amber-300',
     colors: ['#F59E0B', '#78350F', '#1C1917'],
     tagline: 'PREMIUM CHRONICLE ASSOCIATES',
@@ -37,8 +37,8 @@ const studioStyles = {
   },
   minimalist: {
     name: 'Clean Tech',
-    bg: 'from-slate-100 via-sky-50 to-slate-200 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900',
-    cardBg: 'bg-white/80 dark:bg-slate-950/80 border-slate-300 dark:border-slate-800 text-slate-950 dark:text-slate-50',
+    bg: 'bg-slate-100 dark:bg-slate-900',
+    cardBg: 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-950 dark:text-slate-50',
     font: 'font-sans font-bold tracking-tight uppercase text-sky-600 dark:text-sky-400',
     colors: ['#0284C7', '#64748B', '#F1F5F9'],
     tagline: 'MINIMAL OPERATION SYSTEMS',
@@ -46,8 +46,8 @@ const studioStyles = {
   },
   bio: {
     name: 'Organic Growth',
-    bg: 'from-emerald-950 via-teal-950 to-zinc-950',
-    cardBg: 'bg-zinc-950/90 border-emerald-500/20 text-emerald-50',
+    bg: 'bg-[#082822]',
+    cardBg: 'bg-zinc-900 border-emerald-500/20 text-emerald-50',
     font: 'font-sans font-semibold tracking-wide text-emerald-400',
     colors: ['#10B981', '#115E59', '#18181B'],
     tagline: 'ECOLOGICAL RESOURCE CO.',
@@ -167,7 +167,7 @@ const Studio = () => {
           <div className="premium-card p-6 md:p-8 space-y-6">
             <h3 className="text-lg font-bold">Generated Brand Assets</h3>
             
-            <div className={`w-full h-56 rounded-2xl bg-gradient-to-tr ${current.bg} flex items-center justify-center relative overflow-hidden shadow-inner`}>
+            <div className={`w-full h-56 rounded-2xl ${current.bg} flex items-center justify-center relative overflow-hidden shadow-inner`}>
               <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(0,0,0,0.5)_100%)]" />
               
@@ -248,7 +248,7 @@ const Studio = () => {
                 >
                   {/* Inst Profile */}
                   <div className="p-4 flex items-center gap-3 border-b border-slate-200/40 dark:border-slate-800/40">
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${current.bg} border border-white/20`} />
+                    <div className={`w-8 h-8 rounded-full ${current.bg} border border-white/20`} />
                     <div className="space-y-0.5">
                       <p className="text-xs font-extrabold tracking-tight">{brandName.toLowerCase().replace(/\s+/g, '')}</p>
                       <p className="text-[9px] text-muted">Sponsored</p>
@@ -256,7 +256,7 @@ const Studio = () => {
                   </div>
 
                   {/* Inst Visual Post */}
-                  <div className={`aspect-square w-full bg-gradient-to-tr ${current.bg} flex items-center justify-center p-6 relative overflow-hidden`}>
+                  <div className={`aspect-square w-full ${current.bg} flex items-center justify-center p-6 relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
                     <h4 className={`text-center font-black leading-none drop-shadow ${current.font} text-3xl`}>
                       {brandName}
@@ -283,7 +283,7 @@ const Studio = () => {
                   className="max-w-xl mx-auto border border-slate-200/60 dark:border-slate-800/60 rounded-2xl bg-primary p-4 space-y-4 shadow-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-tr ${current.bg} border border-white/20`} />
+                    <div className={`w-10 h-10 rounded-lg ${current.bg} border border-white/20`} />
                     <div className="space-y-0.5">
                       <h4 className="text-xs font-extrabold">{brandName}</h4>
                       <p className="text-[9px] text-muted">14,230 followers • Promote</p>
@@ -292,7 +292,7 @@ const Studio = () => {
 
                   <p className="text-xs leading-relaxed text-text/95 font-medium">{current.socialPost}</p>
 
-                  <div className={`w-full h-48 bg-gradient-to-tr ${current.bg} border border-slate-200/40 dark:border-slate-800/40 rounded-xl flex items-center justify-center relative overflow-hidden`}>
+                  <div className={`w-full h-48 ${current.bg} border border-slate-200/40 dark:border-slate-800/40 rounded-xl flex items-center justify-center relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
                     <h4 className={`font-black text-center leading-none ${current.font} text-2xl`}>
                       {brandName}

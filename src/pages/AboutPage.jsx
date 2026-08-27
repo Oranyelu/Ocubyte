@@ -56,9 +56,12 @@ const AboutPage = () => {
         </div>
 
         <div className="md:col-span-5 flex justify-center">
-          <div className="relative w-full max-w-[280px] aspect-square rounded-3xl bg-gradient-to-tr from-accent to-indigo-600 p-6 shadow-xl flex flex-col justify-between overflow-hidden">
+          <div className="relative w-full max-w-[280px] aspect-square rounded-3xl bg-accent p-6 shadow-xl flex flex-col justify-between overflow-hidden">
             <div className="absolute inset-0 bg-grid-white/[0.04] bg-[size:16px_16px]" />
-            <span className="text-white/60 text-xs font-mono font-bold uppercase">EST. 2024</span>
+            <div className="flex justify-between items-start">
+              <span className="text-white/60 text-xs font-mono font-bold uppercase">EST. 2024</span>
+              <span className="text-white/60 text-[10px] font-mono font-bold uppercase">RC - 9677104</span>
+            </div>
             <div className="text-white space-y-1">
               <p className="text-3xl font-black">We Byte</p>
               <p className="text-3xl font-black">Hard.</p>

@@ -12,7 +12,12 @@ import {
   Play, 
   Layers,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Users,
+  Shield,
+  Trees,
+  Building,
+  Boxes
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import Button from '../components/Button';
@@ -70,15 +75,7 @@ const Home = () => {
       {/* Hero Section */}
       <section className="relative pt-12 pb-24 md:pt-20 md:pb-32 px-6">
         <div className="container mx-auto max-w-6xl text-center space-y-8">
-          <motion.div
-            initial={{ opacity: 0, y: -25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-semibold mb-2"
-          >
-            <Sparkles size={16} />
-            <span>Theme-Adaptive Experience</span>
-          </motion.div>
+
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -116,17 +113,59 @@ const Home = () => {
             </Link>
           </motion.div>
 
-          {/* Prompt to toggle themes */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 0.6 }}
-            className="text-xs text-muted/80 italic pt-2"
-          >
-            💡 Hint: Try clicking the theme toggle switch in the top right to watch the design morph!
-          </motion.p>
+
         </div>
       </section>
+
+      {/* Brand Logos Auto-Scroll Band */}
+      <div className="w-full py-8 border-y border-slate-200/40 dark:border-slate-800/40 bg-slate-50 dark:bg-slate-900/10 overflow-hidden relative">
+        <div className="flex w-max animate-marquee">
+          <div className="flex space-x-16 px-8 items-center shrink-0">
+            <a href="https://ohabuenyi.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Users size={16} />
+              <span>OHA BU ENYI</span>
+            </a>
+            <a href="https://global-care-pathways.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Shield size={16} />
+              <span>GLOBAL CARE PATHWAYS</span>
+            </a>
+            <a href="https://www.georgewoodcasket.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Trees size={16} />
+              <span>GEORGE WOOD CASKET</span>
+            </a>
+            <a href="https://riseborough-website.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Building size={16} />
+              <span>RISEBOROUGH APARTMENTS</span>
+            </a>
+            <a href="https://ogbako-web.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Boxes size={16} />
+              <span>OGBAKO</span>
+            </a>
+          </div>
+          <div className="flex space-x-16 px-8 items-center shrink-0" aria-hidden="true">
+            <a href="https://ohabuenyi.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Users size={16} />
+              <span>OHA BU ENYI</span>
+            </a>
+            <a href="https://global-care-pathways.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Shield size={16} />
+              <span>GLOBAL CARE PATHWAYS</span>
+            </a>
+            <a href="https://www.georgewoodcasket.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Trees size={16} />
+              <span>GEORGE WOOD CASKET</span>
+            </a>
+            <a href="https://riseborough-website.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Building size={16} />
+              <span>RISEBOROUGH APARTMENTS</span>
+            </a>
+            <a href="https://ogbako-web.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-text/40 hover:text-text/80 transition-colors duration-300 font-extrabold tracking-widest text-xs md:text-sm font-mono whitespace-nowrap">
+              <Boxes size={16} />
+              <span>OGBAKO</span>
+            </a>
+          </div>
+        </div>
+      </div>
 
       {/* Services Grid (In Plain English) */}
       <section className="py-20 px-6 bg-slate-950/20 border-y border-slate-200/50 dark:border-slate-800/50">
@@ -387,24 +426,24 @@ const Home = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {/* Case Study 1 */}
             <GlassCard className="p-0 overflow-hidden flex flex-col justify-between group">
-              <div className="relative aspect-video bg-gradient-to-br from-violet-900 to-indigo-950 p-6 flex flex-col justify-between overflow-hidden">
+              <div className="relative aspect-video bg-[#082822] p-6 flex flex-col justify-between overflow-hidden">
                 <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
-                <span className="text-[10px] font-bold font-mono tracking-widest text-violet-300 uppercase px-2.5 py-1 rounded bg-violet-800/40 border border-violet-500/20 self-start">
-                  Branding + Web App
+                <span className="text-[10px] font-bold font-mono tracking-widest text-[#3ecf8e] uppercase px-2.5 py-1 rounded bg-[#082822] border border-[#27303f]/50 self-start">
+                  Membership + Web App
                 </span>
-                <h4 className="text-2xl font-black text-white relative z-10">Mosaik Art</h4>
-                <div className="text-white/60 text-xs">Custom Portfolio & Booking Engine</div>
+                <h4 className="text-2xl font-black text-white relative z-10">Ogbako</h4>
+                <div className="text-[#3ecf8e] text-xs">Community Management Platform</div>
               </div>
               <div className="p-6 space-y-4 flex-grow flex flex-col justify-between">
                 <div className="space-y-2">
-                  <h4 className="text-lg font-bold">Mosaik Creative Platform</h4>
+                  <h4 className="text-lg font-bold">Ogbako Community Platform</h4>
                   <p className="text-muted text-xs leading-relaxed">
-                    Designed a bold geometric logo/identity and built a bespoke web gallery enabling artist bookings, generating over $20k in bookings month one.
+                    Designed and built a multi-tenant membership platform featuring automated dues tracking, secure member directories, custom financial reporting dashboards, and an engagement feed.
                   </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Branding</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Vite</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">React</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Next.js</span>
                   <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Supabase</span>
                 </div>
               </div>
@@ -412,50 +451,50 @@ const Home = () => {
 
             {/* Case Study 2 */}
             <GlassCard className="p-0 overflow-hidden flex flex-col justify-between group">
-              <div className="relative aspect-video bg-gradient-to-br from-cyan-900 to-emerald-950 p-6 flex flex-col justify-between overflow-hidden">
+              <div className="relative aspect-video bg-[#2563eb] p-6 flex flex-col justify-between overflow-hidden">
                 <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
-                <span className="text-[10px] font-bold font-mono tracking-widest text-cyan-300 uppercase px-2.5 py-1 rounded bg-cyan-800/40 border border-cyan-500/20 self-start">
-                  Automated Workflows
+                <span className="text-[10px] font-bold font-mono tracking-widest text-blue-200 uppercase px-2.5 py-1 rounded bg-blue-900/50 border border-blue-700/20 self-start">
+                  Dashboard + Verification
                 </span>
-                <h4 className="text-2xl font-black text-white relative z-10">Apex Logistics</h4>
-                <div className="text-white/60 text-xs">Automated Dispatch System</div>
+                <h4 className="text-2xl font-black text-white relative z-10">Global Care Pathways</h4>
+                <div className="text-blue-100 text-xs">CareerPath Medical Dashboard</div>
               </div>
               <div className="p-6 space-y-4 flex-grow flex flex-col justify-between">
                 <div className="space-y-2">
-                  <h4 className="text-lg font-bold">Apex Flow Hub</h4>
+                  <h4 className="text-lg font-bold">CareerPath Dashboard</h4>
                   <p className="text-muted text-xs leading-relaxed">
-                    Eliminated 25 hours/week of administrative work by automating client invoice matching, WhatsApp courier updates, and CRM sync pipelines.
+                    Engineered a premium medical onboarding and credential verification dashboard. Automates profile verification, cover letter customization, and direct routing to partner hospital recruitment systems.
                   </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Automation</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Stripe API</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Slack API</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Next.js</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Paystack</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Supabase</span>
                 </div>
               </div>
             </GlassCard>
 
             {/* Case Study 3 */}
             <GlassCard className="p-0 overflow-hidden flex flex-col justify-between group">
-              <div className="relative aspect-video bg-gradient-to-br from-rose-950 to-orange-950 p-6 flex flex-col justify-between overflow-hidden">
+              <div className="relative aspect-video bg-[#135B3A] p-6 flex flex-col justify-between overflow-hidden">
                 <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
-                <span className="text-[10px] font-bold font-mono tracking-widest text-rose-300 uppercase px-2.5 py-1 rounded bg-rose-800/40 border border-rose-500/20 self-start">
-                  Social Presence + Identity
+                <span className="text-[10px] font-bold font-mono tracking-widest text-emerald-200 uppercase px-2.5 py-1 rounded bg-emerald-900/50 border border-emerald-700/20 self-start">
+                  Booking + Premium Web
                 </span>
-                <h4 className="text-2xl font-black text-white relative z-10">VibeSync</h4>
-                <div className="text-white/60 text-xs">Social Growth & Content Engine</div>
+                <h4 className="text-2xl font-black text-white relative z-10">Riseborough</h4>
+                <div className="text-emerald-100 text-xs">Luxury Accommodation Booking Hub</div>
               </div>
               <div className="p-6 space-y-4 flex-grow flex flex-col justify-between">
                 <div className="space-y-2">
-                  <h4 className="text-lg font-bold">VibeSync Content Hub</h4>
+                  <h4 className="text-lg font-bold">Riseborough Apartments</h4>
                   <p className="text-muted text-xs leading-relaxed">
-                    Overhauled branding and established a 30-day automated content creation & schedule workflow, increasing LinkedIn and Instagram reach by 140%.
+                    Developed a luxury accommodation booking platform. Features seamless payment processing, calendar synchronization for serviced short-lets, and integration with local systems.
                   </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Branding</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Social Media</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Copywriting</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">React</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Tailwind</span>
+                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Stripe</span>
                 </div>
               </div>
             </GlassCard>
