@@ -22,6 +22,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import Button from '../components/Button';
 import GlassCard from '../components/GlassCard';
+import { HeroIllustration, BrandingIllustration, WebIllustration, AutomationIllustration, SocialIllustration } from '../components/TechIllustration';
 
 const Home = () => {
   const { theme } = useTheme();
@@ -40,22 +41,22 @@ const Home = () => {
 
   const services = [
     {
-      icon: <Palette className="h-7 w-7 text-accent" />,
+      icon: <BrandingIllustration />,
       title: 'Brand Logos & Identities',
       description: 'We design custom logos, color schemes, and brand systems that make your business look highly professional and memorable.'
     },
     {
-      icon: <Globe className="h-7 w-7 text-accent" />,
+      icon: <WebIllustration />,
       title: 'Custom Websites & Apps',
       description: 'We build fast, responsive, and easy-to-use custom websites and web applications tailored specifically to your daily operations.'
     },
     {
-      icon: <Cpu className="h-7 w-7 text-accent" />,
+      icon: <AutomationIllustration />,
       title: 'Automated Workflows',
       description: 'We connect your software tools together to automate daily tasks, eliminating manual data entry and saving you hours of work.'
     },
     {
-      icon: <Share2 className="h-7 w-7 text-accent" />,
+      icon: <SocialIllustration />,
       title: 'Social Media Management',
       description: 'We design, schedule, and publish regular content for your social media pages, building trust and active engagement with your audience.'
     }
@@ -74,46 +75,56 @@ const Home = () => {
 
       {/* Hero Section */}
       <section className="relative pt-12 pb-24 md:pt-20 md:pb-32 px-6">
-        <div className="container mx-auto max-w-6xl text-center space-y-8">
+        <div className="container mx-auto max-w-6xl grid lg:grid-cols-12 gap-12 items-center text-center lg:text-left">
+          {/* Left Column - Text Content */}
+          <div className="lg:col-span-7 space-y-6">
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.1 }}
+              className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1]"
+            >
+              We design <span className="gradient-text">brands</span>, build{' '}
+              <span className="gradient-text">websites</span>, and{' '}
+              <span className="gradient-text">automate</span> your business.
+            </motion.h1>
 
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 text-muted leading-relaxed"
+            >
+              In plain English: We upgrade your visual presence, handle your software development, connect your tools, and run your social media so you can focus on growing.
+            </motion.p>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] max-w-4xl mx-auto"
-          >
-            We design <span className="gradient-text">brands</span>, build{' '}
-            <span className="gradient-text">websites</span>, and{' '}
-            <span className="gradient-text">automate</span> your business.
-          </motion.h1>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="flex flex-col sm:flex-row justify-center lg:justify-start items-center gap-4 pt-2"
+            >
+              <Link to="/contact">
+                <Button className="w-full sm:w-auto px-8 py-3.5 text-base shadow-lg shadow-accent/20 hover:scale-105 active:scale-95 transition-transform duration-300">
+                  Partner with Us
+                </Button>
+              </Link>
+              <Link to="/services" className="text-text hover:text-accent font-semibold transition-colors flex items-center gap-2">
+                Explore Our Services <ArrowRight size={18} />
+              </Link>
+            </motion.div>
+          </div>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-lg md:text-xl max-w-2xl mx-auto text-muted"
-          >
-            In plain English: We upgrade your visual presence, handle your software development, connect your tools, and run your social media so you can focus on growing.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4"
-          >
-            <Link to="/contact">
-              <Button className="px-8 py-3.5 text-base shadow-lg shadow-accent/20 hover:scale-105 active:scale-95 transition-transform duration-300">
-                Partner with Us
-              </Button>
-            </Link>
-            <Link to="/services" className="text-text hover:text-accent font-semibold transition-colors flex items-center gap-2">
-              Explore Our Services <ArrowRight size={18} />
-            </Link>
-          </motion.div>
-
-
+          {/* Right Column - Tech Illustration */}
+          <div className="lg:col-span-5 hidden lg:block">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <HeroIllustration />
+            </motion.div>
+          </div>
         </div>
       </section>
 
@@ -187,7 +198,7 @@ const Home = () => {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
                 <GlassCard className="h-full flex items-start gap-5 hover:-translate-y-1 transition-all">
-                  <div className="p-3.5 rounded-2xl bg-accent/10 border border-accent/20 flex-shrink-0">
+                  <div className="flex-shrink-0">
                     {service.icon}
                   </div>
                   <div className="space-y-2">

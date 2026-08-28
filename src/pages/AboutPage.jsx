@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Button from '../components/Button';
+import { AboutIllustration } from '../components/TechIllustration';
 
 const AboutPage = () => {
   const values = [
@@ -55,20 +56,9 @@ const AboutPage = () => {
           </p>
         </div>
 
-        <div className="md:col-span-5 flex justify-center">
-          <div className="relative w-full max-w-[280px] aspect-square rounded-3xl bg-accent p-6 shadow-xl flex flex-col justify-between overflow-hidden">
-            <div className="absolute inset-0 bg-grid-white/[0.04] bg-[size:16px_16px]" />
-            <div className="flex justify-between items-start">
-              <span className="text-white/60 text-xs font-mono font-bold uppercase">EST. 2024</span>
-              <span className="text-white/60 text-[10px] font-mono font-bold uppercase">RC - 9677104</span>
-            </div>
-            <div className="text-white space-y-1">
-              <p className="text-3xl font-black">We Byte</p>
-              <p className="text-3xl font-black">Hard.</p>
-            </div>
-            <div className="text-white/80 text-[10px] uppercase font-bold tracking-wider">
-              Creative Product Studio
-            </div>
+        <div className="md:col-span-5 flex justify-center items-center">
+          <div className="w-full max-w-[320px] aspect-square flex items-center justify-center">
+            <AboutIllustration />
           </div>
         </div>
       </div>

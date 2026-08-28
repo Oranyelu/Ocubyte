@@ -26,7 +26,7 @@ const projectsData = [
     name: 'Ogbako Community Platform',
     category: 'development',
     description: 'Designed and built a multi-tenant membership platform. The platform features automated dues tracking, secure member directories, custom financial reporting dashboards, and an engagement feed.',
-    outcome: 'Supported 500+ active communities and automated the collection and verification of over $2M in group dues.',
+    outcome: 'Supported 500+ active communities and automated the collection and verification of over ₦2 Billion in group dues.',
     client: 'Ogbako',
     tech: ['React', 'Next.js', 'Tailwind', 'Supabase', 'PostgreSQL'],
     accentColor: 'bg-[#082822]',

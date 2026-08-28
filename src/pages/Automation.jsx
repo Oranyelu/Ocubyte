@@ -94,14 +94,14 @@ const Automation = () => {
         setActiveStepIdx(idx);
         let logMsg = '';
         if (idx === 0) {
-          logMsg = `📥 [INCOMING] Payload received: { customer: "Jane Doe", amount: "$150.00", status: "succeeded" }`;
+          logMsg = `📥 [INCOMING] Payload received: { customer: "Jane Doe", amount: "₦150,000.00", status: "succeeded" }`;
         } else {
           switch (node.type) {
             case 'email':
               logMsg = `✉️ [API Resend] Sending greeting template to client: jane@example.com`;
               break;
             case 'slack':
-              logMsg = `💬 [API Slack] Dispatched alert: "New checkout registered - $150.00!"`;
+              logMsg = `💬 [API Slack] Dispatched alert: "New checkout registered - ₦150,000.00!"`;
               break;
             case 'db':
               logMsg = `💾 [DB Supabase] Inserted record into "checkouts" table: Row ID #${Math.floor(Math.random() * 9000) + 1000}`;

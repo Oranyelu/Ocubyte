@@ -17,14 +17,14 @@ import {
 
 const ServicesPage = () => {
   const [calcHours, setCalcHours] = useState(15);
-  const [calcEmployeeCost, setCalcEmployeeCost] = useState(35);
+  const [calcEmployeeCost, setCalcEmployeeCost] = useState(5000);
   const [calcTraffic, setCalcTraffic] = useState(5000);
 
   // ROI calculations
   const monthlySavings = Math.round(calcHours * 4.33 * calcEmployeeCost);
   const yearlySavings = Math.round(monthlySavings * 12);
   // Estimate traffic conversion value
-  const monthlyConversionsVal = Math.round(calcTraffic * 0.02 * 150); 
+  const monthlyConversionsVal = Math.round(calcTraffic * 0.02 * 45000); 
 
   const mainServices = [
     {
@@ -210,12 +210,13 @@ const ServicesPage = () => {
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-bold flex items-center gap-1.5"><Briefcase size={14} /> Hourly Operational Rate</span>
-                  <span className="text-accent font-extrabold">${calcEmployeeCost} / Hour</span>
+                  <span className="text-accent font-extrabold">₦{calcEmployeeCost.toLocaleString()} / Hour</span>
                 </div>
                 <input
                   type="range"
-                  min="15"
-                  max="150"
+                  min="1000"
+                  max="50000"
+                  step="1000"
                   value={calcEmployeeCost}
                   onChange={(e) => setCalcEmployeeCost(parseInt(e.target.value))}
                   className="w-full accent-accent h-1.5 rounded-lg bg-slate-200/50 dark:bg-slate-800/50 appearance-none cursor-pointer"
@@ -247,17 +248,17 @@ const ServicesPage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <p className="text-[10px] uppercase font-bold text-muted">Weekly Recovered</p>
-                <p className="text-xl font-extrabold">{Math.round(calcHours * calcEmployeeCost)} USD</p>
+                <p className="text-xl font-extrabold">₦{Math.round(calcHours * calcEmployeeCost).toLocaleString()}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] uppercase font-bold text-muted">Yearly Saved</p>
-                <p className="text-xl font-extrabold text-accent">${yearlySavings.toLocaleString()}</p>
+                <p className="text-xl font-extrabold text-accent">₦{yearlySavings.toLocaleString()}</p>
               </div>
             </div>
 
             <div className="p-4 bg-accent/5 rounded-xl border border-accent/15 space-y-1">
               <p className="text-[10px] uppercase font-bold text-accent">Brand & Design Conversion Uplift</p>
-              <p className="text-2xl font-black text-text">${monthlyConversionsVal.toLocaleString()} / mo</p>
+              <p className="text-2xl font-black text-text">₦{monthlyConversionsVal.toLocaleString()} / mo</p>
               <p className="text-[10px] text-muted leading-tight">
                 *Estimated value increase from converting visitor traffic into clients using a modern website layout and brand identity.
               </p>

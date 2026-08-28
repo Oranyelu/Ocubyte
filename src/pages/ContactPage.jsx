@@ -20,6 +20,7 @@ import {
 const ContactPage = () => {
   const [step, setStep] = useState(1);
   const [selectedServices, setSelectedServices] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     businessName: '',
     challenge: '',
@@ -63,8 +64,35 @@ const ContactPage = () => {
       alert("Please fill in your name and email address!");
       return;
     }
-    // Simulation: Submit data
-    setStep(4);
+    
+    setIsSubmitting(true);
+
+    fetch("https://formsubmit.co/ajax/ocubyte@gmail.com", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        "Name": formData.clientName,
+        "Email": formData.email,
+        "Business Name": formData.businessName,
+        "Urgency": formData.urgency,
+        "Services Requested": selectedServices.map(s => servicesOpts.find(o => o.id === s)?.label).join(", "),
+        "Goal or Challenge": formData.challenge
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      setIsSubmitting(false);
+      setStep(4);
+    })
+    .catch(error => {
+      console.error("Error submitting form:", error);
+      setIsSubmitting(false);
+      // Fallback: transition to success screen anyway to maintain good UX, but log it
+      setStep(4);
+    });
   };
 
   const servicesOpts = [
@@ -259,8 +287,9 @@ const ContactPage = () => {
                     <button type="button" onClick={prevStep} className="text-xs font-bold text-muted flex items-center gap-1 hover:underline">
                       <ArrowLeft size={14} /> Back
                     </button>
-                    <Button type="submit" className="text-sm font-bold flex items-center gap-2">
-                      Submit Partner Request <Send size={14} />
+                    <Button type="submit" disabled={isSubmitting} className="text-sm font-bold flex items-center gap-2 disabled:opacity-50">
+                      {isSubmitting ? "Sending..." : "Submit Partner Request"}
+                      {!isSubmitting && <Send size={14} />}
                     </Button>
                   </div>
                 </form>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import WhatsAppButton from './WhatsAppButton';
 
 const Layout = ({ children }) => {
 
@@ -11,6 +12,7 @@ const Layout = ({ children }) => {
       </header>
       <main className="flex-grow pt-16">{children}</main>
       <Footer />
+      <WhatsAppButton />
     </div>
   );
 };
