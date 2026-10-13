@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { cn } from '../utils/cn';
 import ThemeSwitcher from './ThemeSwitcher';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
@@ -23,7 +23,8 @@ const Navbar = () => {
     { name: 'About', path: '/about' },
     { name: 'Services', path: '/services' },
     { name: 'Projects', path: '/projects' },
-    { name: 'Automation Studio', path: '/automation' },
+    { name: 'Automation', path: '/automation' },
+    { name: 'Payment Gateway', path: '/gateway' },
     { name: 'Design Studio', path: '/studio' },
     { name: 'Contact', path: '/contact' }
   ];
@@ -74,11 +75,18 @@ const Navbar = () => {
         </div>
 
         {/* Action Controls */}
-        <div className="hidden xl:flex items-center gap-4">
+        <div className="hidden xl:flex items-center gap-3">
           <ThemeSwitcher />
           <Link
+            to="/pay"
+            className="px-4 py-2 rounded-full text-xs font-semibold border border-slate-700/80 hover:border-accent text-text hover:text-accent transition-all duration-300 flex items-center gap-1.5"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-accent" />
+            <span>Pay Online</span>
+          </Link>
+          <Link
             to="/contact"
-            className="px-5 py-2 rounded-full text-sm font-semibold border border-accent/20 bg-accent/5 hover:bg-accent hover:text-white transition-all duration-300"
+            className="px-5 py-2 rounded-full text-xs font-semibold border border-accent/20 bg-accent/10 text-accent hover:bg-accent hover:text-primary transition-all duration-300"
           >
             Start Project
           </Link>
@@ -124,13 +132,23 @@ const Navbar = () => {
                   </Link>
                 );
               })}
-              <Link
-                to="/contact"
-                onClick={() => setIsOpen(false)}
-                className="mt-4 text-center px-6 py-3 rounded-xl bg-accent text-white font-bold shadow-lg shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                Start a Partnership
-              </Link>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <Link
+                  to="/pay"
+                  onClick={() => setIsOpen(false)}
+                  className="text-center px-4 py-3 rounded-xl border border-slate-700 bg-secondary text-text font-bold text-sm hover:border-accent hover:text-accent transition-all flex items-center justify-center gap-1.5"
+                >
+                  <CreditCard className="w-4 h-4 text-accent" />
+                  <span>Pay Online</span>
+                </Link>
+                <Link
+                  to="/contact"
+                  onClick={() => setIsOpen(false)}
+                  className="text-center px-4 py-3 rounded-xl bg-accent text-primary font-bold text-sm shadow-lg shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center"
+                >
+                  Start Project
+                </Link>
+              </div>
             </div>
           </motion.div>
         )}

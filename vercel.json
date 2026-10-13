@@ -1,5 +1,26 @@
 {
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-ocubyte-signature, x-merchant-id, x-merchant-secret" }
+      ]
+    },
+    {
+      "source": "/v1/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-ocubyte-signature, x-merchant-id, x-merchant-secret" }
+      ]
+    }
+  ],
   "rewrites": [
+    { "source": "/v1/gateway/verify/:reference", "destination": "/api/v1/gateway/verify/[reference]?reference=:reference" },
+    { "source": "/api/v1/gateway/verify/:reference", "destination": "/api/v1/gateway/verify/[reference]?reference=:reference" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -12,7 +12,8 @@ import {
   ArrowRight,
   TrendingUp,
   Clock,
-  Briefcase
+  Briefcase,
+  CreditCard
 } from 'lucide-react';
 
 const ServicesPage = () => {
@@ -73,6 +74,18 @@ const ServicesPage = () => {
         'Professional copywriting and hashtags',
         'Automated multi-platform scheduling',
         'Consistent brand messaging & aesthetics'
+      ]
+    },
+    {
+      icon: <CreditCard className="h-10 w-10 text-accent" />,
+      title: 'Payment Gateway & Paystack Solutions',
+      summary: 'Collect payments on your own site & third-party stores.',
+      description: 'Accept credit cards, USSD, and bank transfers via Paystack on Ocubyte or connect affiliated e-commerce sites using Ocubyte as a hosted payment gateway with instant callbacks.',
+      bullets: [
+        'Seamless Paystack inline & card checkout',
+        'Hosted gateway checkout for affiliated merchant sites',
+        'Cryptographic confirmation signatures & redirects',
+        'Real-time transaction auditing and digital receipts'
       ]
     }
   ];
@@ -153,6 +166,12 @@ const ServicesPage = () => {
                   <Link to="/automation">
                     <Button className="w-full text-sm font-bold flex justify-center items-center gap-2">
                       Test Workflow Builder <ArrowRight size={14} />
+                    </Button>
+                  </Link>
+                ) : service.title.includes('Payment Gateway') ? (
+                  <Link to="/gateway">
+                    <Button className="w-full text-sm font-bold flex justify-center items-center gap-2">
+                      Explore Gateway Hub <ArrowRight size={14} />
                     </Button>
                   </Link>
                 ) : service.title.includes('Brand') ? (

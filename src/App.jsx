@@ -8,6 +8,10 @@ import ServicesPage from './pages/ServicesPage';
 import ContactPage from './pages/ContactPage';
 import Automation from './pages/Automation';
 import Studio from './pages/Studio';
+import PayPage from './pages/PayPage';
+import GatewayPortal from './pages/GatewayPortal';
+import GatewayCheckout from './pages/GatewayCheckout';
+import GatewayDemoCallback from './pages/GatewayDemoCallback';
 import NotFound from './pages/NotFound';
 
 const App = () => {
@@ -21,6 +25,10 @@ const App = () => {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/automation" element={<Automation />} />
         <Route path="/studio" element={<Studio />} />
+        <Route path="/pay" element={<PayPage />} />
+        <Route path="/gateway" element={<GatewayPortal />} />
+        <Route path="/gateway/checkout" element={<GatewayCheckout />} />
+        <Route path="/gateway/demo-callback" element={<GatewayDemoCallback />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

@@ -17,12 +17,16 @@ import {
   Shield,
   Trees,
   Building,
-  Boxes
+  Boxes,
+  CreditCard
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import Button from '../components/Button';
 import GlassCard from '../components/GlassCard';
 import { HeroIllustration, BrandingIllustration, WebIllustration, AutomationIllustration, SocialIllustration } from '../components/TechIllustration';
+import { projectsData } from '../data/projects';
+import ProjectCard from '../components/ProjectCard';
+import ProjectModal from '../components/ProjectModal';
 
 const Home = () => {
   const { theme } = useTheme();
@@ -30,6 +34,18 @@ const Home = () => {
   const [brandName, setBrandName] = useState('My Business');
   const [brandVibe, setBrandVibe] = useState('bold'); // bold, elegant, tech, eco
   const [simStep, setSimStep] = useState(0); // 0: Idle, 1: Step 1, 2: Step 2, 3: Success
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenSocials = (project) => {
+    setSelectedProject(project);
+    setIsModalOpen(true);
+  };
+
+  const featuredProjectIds = [1, 3, 2];
+  const featuredProjects = featuredProjectIds
+    .map(id => projectsData.find(p => p.id === id))
+    .filter(Boolean);
 
   // Configuration for branding interactive demo
   const vibes = {
@@ -435,80 +451,104 @@ const Home = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Case Study 1 */}
-            <GlassCard className="p-0 overflow-hidden flex flex-col justify-between group">
-              <div className="relative aspect-video bg-[#082822] p-6 flex flex-col justify-between overflow-hidden">
-                <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
-                <span className="text-[10px] font-bold font-mono tracking-widest text-[#3ecf8e] uppercase px-2.5 py-1 rounded bg-[#082822] border border-[#27303f]/50 self-start">
-                  Membership + Web App
-                </span>
-                <h4 className="text-2xl font-black text-white relative z-10">Ogbako</h4>
-                <div className="text-[#3ecf8e] text-xs">Community Management Platform</div>
-              </div>
-              <div className="p-6 space-y-4 flex-grow flex flex-col justify-between">
-                <div className="space-y-2">
-                  <h4 className="text-lg font-bold">Ogbako Community Platform</h4>
-                  <p className="text-muted text-xs leading-relaxed">
-                    Designed and built a multi-tenant membership platform featuring automated dues tracking, secure member directories, custom financial reporting dashboards, and an engagement feed.
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">React</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Next.js</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Supabase</span>
-                </div>
-              </div>
-            </GlassCard>
+            {featuredProjects.map((project) => (
+              <ProjectCard 
+                key={project.id} 
+                project={project} 
+                onOpenSocials={handleOpenSocials} 
+              />
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Case Study 2 */}
-            <GlassCard className="p-0 overflow-hidden flex flex-col justify-between group">
-              <div className="relative aspect-video bg-[#2563eb] p-6 flex flex-col justify-between overflow-hidden">
-                <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
-                <span className="text-[10px] font-bold font-mono tracking-widest text-blue-200 uppercase px-2.5 py-1 rounded bg-blue-900/50 border border-blue-700/20 self-start">
-                  Dashboard + Verification
-                </span>
-                <h4 className="text-2xl font-black text-white relative z-10">Global Care Pathways</h4>
-                <div className="text-blue-100 text-xs">CareerPath Medical Dashboard</div>
-              </div>
-              <div className="p-6 space-y-4 flex-grow flex flex-col justify-between">
-                <div className="space-y-2">
-                  <h4 className="text-lg font-bold">CareerPath Dashboard</h4>
-                  <p className="text-muted text-xs leading-relaxed">
-                    Engineered a premium medical onboarding and credential verification dashboard. Automates profile verification, cover letter customization, and direct routing to partner hospital recruitment systems.
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Next.js</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Paystack</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Supabase</span>
-                </div>
-              </div>
-            </GlassCard>
+      {/* Project Modal for socials */}
+      <ProjectModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        project={selectedProject} 
+      />
 
-            {/* Case Study 3 */}
-            <GlassCard className="p-0 overflow-hidden flex flex-col justify-between group">
-              <div className="relative aspect-video bg-[#135B3A] p-6 flex flex-col justify-between overflow-hidden">
-                <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:16px_16px]" />
-                <span className="text-[10px] font-bold font-mono tracking-widest text-emerald-200 uppercase px-2.5 py-1 rounded bg-emerald-900/50 border border-emerald-700/20 self-start">
-                  Booking + Premium Web
-                </span>
-                <h4 className="text-2xl font-black text-white relative z-10">Riseborough</h4>
-                <div className="text-emerald-100 text-xs">Luxury Accommodation Booking Hub</div>
+      {/* Payment Gateway & Paystack Showcase Section */}
+      <section className="py-20 px-6 bg-slate-900/40 border-y border-slate-800/60 relative overflow-hidden">
+        <div className="container mx-auto max-w-6xl">
+          <div className="grid lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-7 space-y-6 text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent/15 text-accent border border-accent/30">
+                <CreditCard className="w-4 h-4" />
+                <span>Paystack Integration & Affiliate Payment Gateway</span>
               </div>
-              <div className="p-6 space-y-4 flex-grow flex flex-col justify-between">
-                <div className="space-y-2">
-                  <h4 className="text-lg font-bold">Riseborough Apartments</h4>
-                  <p className="text-muted text-xs leading-relaxed">
-                    Developed a luxury accommodation booking platform. Features seamless payment processing, calendar synchronization for serviced short-lets, and integration with local systems.
-                  </p>
+              <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                Accept Payments In-App & Power Your <span className="text-accent">Affiliate Network</span>
+              </h2>
+              <p className="text-muted text-base leading-relaxed">
+                Whether settling design and development milestones directly with Ocubyte, or using Ocubyte as a hosted payment gateway for your affiliated e-commerce websites — our Paystack-powered checkout delivers instant, encrypted transactions with automated return callbacks.
+              </p>
+              
+              <div className="grid sm:grid-cols-2 gap-4 pt-2">
+                <div className="p-4 rounded-2xl bg-secondary/80 border border-slate-700/60 space-y-1">
+                  <div className="text-accent font-bold text-sm">Direct In-App Checkout</div>
+                  <p className="text-xs text-muted">Pay for custom invoices, retainers, and services with Paystack inline cards or bank transfer.</p>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">React</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Tailwind</span>
-                  <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800/50 px-2 py-0.5 rounded text-muted font-semibold">Stripe</span>
+                <div className="p-4 rounded-2xl bg-secondary/80 border border-slate-700/60 space-y-1">
+                  <div className="text-cyan-400 font-bold text-sm">Hosted Affiliate Gateway</div>
+                  <p className="text-xs text-muted">Third-party sites redirect to Ocubyte, customer pays, and returns with verified signature.</p>
                 </div>
               </div>
-            </GlassCard>
+
+              <div className="flex flex-wrap gap-4 pt-2">
+                <Link
+                  to="/pay"
+                  className="px-6 py-3 rounded-xl bg-accent text-primary font-bold text-xs sm:text-sm hover:brightness-110 transition shadow-lg shadow-accent/20 flex items-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Make In-App Payment</span>
+                </Link>
+                <Link
+                  to="/gateway"
+                  className="px-6 py-3 rounded-xl border border-slate-700 text-xs sm:text-sm font-semibold text-text hover:bg-slate-800 transition flex items-center gap-2"
+                >
+                  <span>Explore Gateway API & Simulator</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Visual Interactive Preview Card */}
+            <div className="lg:col-span-5">
+              <div className="p-6 rounded-3xl bg-secondary/90 border border-slate-700 backdrop-blur-xl shadow-2xl space-y-5">
+                <div className="flex justify-between items-center text-xs text-muted border-b border-slate-700/60 pb-3">
+                  <span className="font-semibold text-text flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-accent animate-ping" />
+                    Gateway Live Demo
+                  </span>
+                  <span className="font-mono text-accent">SSL 256-Bit</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-primary/60 border border-slate-800 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="text-xs text-muted">Affiliated Merchant</div>
+                      <div className="text-sm font-bold text-text">Apex Tech Store</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-400">Verified</span>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+                    <span className="text-xs text-muted">Sample Cart Total</span>
+                    <span className="text-xl font-extrabold text-accent font-mono">₦45,000</span>
+                  </div>
+                </div>
+
+                <Link
+                  to="/gateway?tab=simulator"
+                  className="w-full py-3 rounded-xl bg-secondary hover:bg-slate-800 border border-slate-700 text-xs font-bold text-text transition flex items-center justify-center gap-2"
+                >
+                  <Play className="w-3.5 h-3.5 text-accent" />
+                  <span>Launch Interactive Simulator</span>
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
