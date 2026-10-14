@@ -1,0 +1,93 @@
+// Ocubyte Payment Gateway Prisma Schema
+// Connects directly to Supabase PostgreSQL (Supports both pooler and direct migrations)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Merchant {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessName   String        @map("business_name")
+  email          String        @unique
+  phone          String?
+  merchantCode   String        @unique @map("merchant_code")
+  publicKey      String        @unique @map("public_key")
+  secretKey      String        @unique @map("secret_key")
+  bankName       String        @map("bank_name")
+  accountNumber  String        @map("account_number") @db.VarChar(20)
+  accountName    String        @map("account_name")
+  bankCode       String?       @map("bank_code") @db.VarChar(10)
+  walletBalance  Decimal       @default(0.00) @map("wallet_balance") @db.Decimal(15, 2)
+  totalVolume    Decimal       @default(0.00) @map("total_volume") @db.Decimal(15, 2)
+  feePercent     Decimal       @default(1.50) @map("fee_percent") @db.Decimal(5, 2)
+  status         String        @default("active")
+  webhookUrl     String?       @map("webhook_url")
+  callbackUrl    String?       @map("callback_url")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  transactions   Transaction[]
+  withdrawals    Withdrawal[]
+
+  @@map("merchants")
+}
+
+model Transaction {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId         String?   @map("merchant_id") @db.Uuid
+  reference          String    @unique
+  amount             Decimal   @db.Decimal(15, 2)
+  fee                Decimal   @default(0.00) @db.Decimal(15, 2)
+  netAmount          Decimal   @map("net_amount") @db.Decimal(15, 2)
+  currency           String    @default("NGN") @db.VarChar(10)
+  customerName       String?   @map("customer_name")
+  customerEmail      String    @map("customer_email")
+  customerPhone      String?   @map("customer_phone")
+  purpose            String?   @default("PAYMENT")
+  channel            String?   @default("card")
+  status             String    @default("pending")
+  paystackReference  String?   @map("paystack_reference")
+  metadata           Json?     @default("{}")
+  paidAt             DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  merchant           Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+
+  @@map("transactions")
+}
+
+model Withdrawal {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  merchantId     String    @map("merchant_id") @db.Uuid
+  reference      String    @unique
+  amount         Decimal   @db.Decimal(15, 2)
+  fee            Decimal   @default(0.00) @db.Decimal(15, 2)
+  netPayout      Decimal   @map("net_payout") @db.Decimal(15, 2)
+  bankName       String    @map("bank_name")
+  accountNumber  String    @map("account_number") @db.VarChar(20)
+  accountName    String    @map("account_name")
+  status         String    @default("pending_review")
+  adminNotes     String?   @map("admin_notes")
+  processedBy    String?   @map("processed_by")
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz(6)
+  proofReference String?   @map("proof_reference")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  merchant       Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("withdrawals")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventType  String   @map("event_type")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  payload    Json?    @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audit_logs")
+}

@@ -12,6 +12,7 @@ import PayPage from './pages/PayPage';
 import GatewayPortal from './pages/GatewayPortal';
 import GatewayCheckout from './pages/GatewayCheckout';
 import GatewayDemoCallback from './pages/GatewayDemoCallback';
+import MerchantPortal from './pages/MerchantPortal';
 import NotFound from './pages/NotFound';
 
 const App = () => {
@@ -29,6 +30,7 @@ const App = () => {
         <Route path="/gateway" element={<GatewayPortal />} />
         <Route path="/gateway/checkout" element={<GatewayCheckout />} />
         <Route path="/gateway/demo-callback" element={<GatewayDemoCallback />} />
+        <Route path="/merchant" element={<MerchantPortal />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

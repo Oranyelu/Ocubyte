@@ -9,6 +9,7 @@
  */
 
 import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
 export const config = {
   api: {
@@ -97,6 +98,31 @@ export default async function handler(req, res) {
       const isObeag = metadata.app === 'obeag' || metadata.merchant_id === 'obeag_portal' || data.reference?.startsWith('OCUBYTE_');
 
       console.log(`[Payment Confirmed]: Reference: ${data.reference}, Amount: ${data.amount / 100} ${data.currency}`);
+
+      // 1. Sync payment to Supabase backend database
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+      if (supabaseUrl && serviceKey && !supabaseUrl.includes('your-supabase-project-id')) {
+        try {
+          const supabase = createClient(supabaseUrl, serviceKey);
+          const merchantCode = metadata.merchant_id || metadata.merchant_code || (isObeag ? 'obeag_portal' : 'ocubyte_direct');
+
+          await supabase.rpc('credit_merchant_payment', {
+            p_merchant_code: merchantCode,
+            p_reference: data.reference,
+            p_amount: data.amount / 100,
+            p_customer_email: data.customer?.email || metadata.customer_email || metadata.email || 'customer@example.com',
+            p_customer_name: metadata.customer_name || metadata.name || '',
+            p_purpose: metadata.purpose || 'PAYMENT',
+            p_metadata: metadata,
+            p_channel: (data.channel || 'card').toLowerCase()
+          });
+          console.log(`[Supabase Webhook Success]: Credited merchant ${merchantCode} for ref: ${data.reference}`);
+        } catch (sbErr) {
+          console.error('[Supabase Webhook Sync Warning]:', sbErr.message);
+        }
+      }
 
       // Section 6: Webhook Specification for Obeag
       if (isObeag) {

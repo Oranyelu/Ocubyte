@@ -30,8 +30,8 @@ import {
   getRecordedTransactions,
   generateReference
 } from '../utils/paystack';
-import PaymentReceipt from '../components/PaymentReceipt';
 import Button from '../components/Button';
+import { getMerchantByCode } from '../lib/supabase';
 
 const SERVICE_PACKAGES = [
   {
@@ -87,8 +87,10 @@ const PayPage = () => {
   const paramUserId = searchParams.get('userId') || searchParams.get('user_id');
   const paramDueIds = searchParams.get('due_ids');
   const paramDescription = searchParams.get('description');
+  const paramMerchantCode = searchParams.get('merchant_code') || searchParams.get('merchant_id');
 
-  const isObeagSession = (paramApp === 'obeag' || paramPurpose || paramRef?.startsWith('OCUBYTE_')) && !!paramRef && !!paramAmount;
+  const [merchantProfile, setMerchantProfile] = useState(null);
+  const isObeagSession = (paramApp === 'obeag' || paramPurpose || paramRef?.startsWith('OCUBYTE_') || paramMerchantCode === 'obeag_portal') && !!paramRef && !!paramAmount;
 
   // Form State
   const [selectedService, setSelectedService] = useState('custom');
@@ -141,6 +143,15 @@ const PayPage = () => {
       });
     }
   }, [isObeagSession, paramRef, paramAmount, paramSignature]);
+
+  // Load Merchant Profile if merchant_code is provided
+  useEffect(() => {
+    if (paramMerchantCode) {
+      getMerchantByCode(paramMerchantCode).then(m => {
+        if (m) setMerchantProfile(m);
+      });
+    }
+  }, [paramMerchantCode]);
 
   const handleSelectPackage = (pkg) => {
     if (isObeagSession) return; // Amount is locked for Obeag
@@ -203,6 +214,47 @@ const PayPage = () => {
     setIsProcessing(false);
     setCompletedTx(tx);
     setRecentTransactions(getRecordedTransactions());
+
+    // Synchronize merchant earnings to Supabase / local wallet store
+    const targetMerchantCode = paramMerchantCode || (isObeagSession ? 'obeag_portal' : 'ocubyte_direct');
+    if (targetMerchantCode) {
+      try {
+        const m = await getMerchantByCode(targetMerchantCode);
+        if (m) {
+          const feePercent = m.fee_percent || 1.5;
+          const fee = Number(amount) * (feePercent / 100);
+          const netCredit = Number(amount) - fee;
+          m.wallet_balance = (Number(m.wallet_balance) || 0) + netCredit;
+          m.total_volume = (Number(m.total_volume) || 0) + Number(amount);
+
+          const stored = JSON.parse(localStorage.getItem('ocubyte_merchants_store') || '[]');
+          const idx = stored.findIndex(sm => sm.id === m.id || sm.merchant_code === m.merchant_code);
+          if (idx !== -1) {
+            stored[idx] = m;
+            localStorage.setItem('ocubyte_merchants_store', JSON.stringify(stored));
+          }
+
+          // Record in merchant transactions store
+          const merchantTxs = JSON.parse(localStorage.getItem('ocubyte_transactions_store') || '[]');
+          merchantTxs.unshift({
+            id: `tx_${Date.now()}`,
+            merchant_id: m.id,
+            reference: tx?.reference || paramRef || invoiceNumber,
+            amount: Number(amount),
+            fee: fee,
+            net_amount: netCredit,
+            customer_name: clientName || 'Customer',
+            customer_email: email,
+            purpose: paramPurpose || notes || 'Payment',
+            status: 'success',
+            paid_at: new Date().toISOString()
+          });
+          localStorage.setItem('ocubyte_transactions_store', JSON.stringify(merchantTxs));
+        }
+      } catch (syncErr) {
+        console.warn('[Merchant Wallet Sync Warning]:', syncErr.message);
+      }
+    }
 
     if (paramCallbackUrl) {
       const finalUrl = await buildObeagCallbackUrl('success');
@@ -300,8 +352,21 @@ const PayPage = () => {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-12 max-w-6xl space-y-12">
-      {/* Obeag Specialized Header when session is active */}
-      {isObeagSession ? (
+      {/* Merchant Specialized Header when custom merchant is active */}
+      {merchantProfile && !isObeagSession ? (
+        <div className="text-center space-y-4 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+            <Building2 className="w-4 h-4 text-emerald-400" />
+            <span>Paying to: {merchantProfile.business_name} • Ocubyte Gateway</span>
+          </div>
+          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-text">
+            {paramDescription || 'Merchant Invoice Checkout'}
+          </h1>
+          <p className="text-muted text-sm sm:text-base max-w-xl mx-auto">
+            Payment for <strong className="text-text">{merchantProfile.business_name}</strong> via Ocubyte Hosted Remita-Grade Gateway.
+          </p>
+        </div>
+      ) : isObeagSession ? (
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600/15 border border-blue-500/30 text-blue-300">
             <Users className="w-4 h-4 text-accent" />

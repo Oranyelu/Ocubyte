@@ -24,6 +24,8 @@ const Footer = () => {
           <span className="text-muted/40">•</span>
           <a href="/gateway" className="hover:text-accent transition">Payment Gateway</a>
           <span className="text-muted/40">•</span>
+          <a href="/merchant" className="hover:text-accent transition">Merchant Portal</a>
+          <span className="text-muted/40">•</span>
           <span className="inline-flex items-center gap-1 text-[11px] text-text/80">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             Paystack Integrated
