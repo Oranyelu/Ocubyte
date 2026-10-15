@@ -352,3 +352,268 @@ export async function getMerchantTransactions(merchantId) {
   const txs = getStored(STORAGE_KEYS.TRANSACTIONS, []);
   return txs.filter(t => t.merchant_id === merchantId || t.merchantId === merchantId);
 }
+
+/**
+ * Fetch SAFE public list of merchants for customer MRN selection (NO bank details, NO balances, NO secret keys)
+ */
+export async function getPublicMerchantsSummary() {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('merchants')
+        .select('id, business_name, merchant_code')
+        .eq('status', 'active')
+        .order('business_name', { ascending: true });
+      if (!error && data && data.length > 0) return data;
+    } catch (e) {
+      console.warn('[Supabase Public Merchants Fetch Warning]:', e.message);
+    }
+  }
+
+  ensureLocalStores();
+  const merchants = getStored(STORAGE_KEYS.MERCHANTS, DEFAULT_LOCAL_MERCHANTS);
+  return merchants.map(m => ({
+    id: m.id,
+    business_name: m.business_name,
+    merchant_code: m.merchant_code
+  }));
+}
+
+/**
+ * Credit merchant wallet when a customer completes payment with MRN
+ */
+export async function creditMerchantPayment({
+  merchantId,
+  amount,
+  reference,
+  customerName = '',
+  customerEmail,
+  customerPhone = '',
+  purpose = 'CUSTOMER_MRN_PAYMENT',
+  channel = 'card',
+  paystackReference = '',
+  metadata = {}
+}) {
+  const numAmount = Number(amount);
+  if (!numAmount || numAmount <= 0) {
+    return { success: false, error: 'Invalid payment amount' };
+  }
+
+  // 1. Try Supabase RPC
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('credit_merchant_payment', {
+        p_merchant_id: merchantId,
+        p_reference: reference,
+        p_amount: numAmount,
+        p_customer_name: customerName,
+        p_customer_email: customerEmail,
+        p_customer_phone: customerPhone,
+        p_purpose: purpose,
+        p_channel: channel,
+        p_paystack_reference: paystackReference || reference,
+        p_metadata: metadata
+      });
+
+      if (!error && data && data.success) {
+        return { success: true, ...data };
+      }
+      if (error) console.warn('[Supabase credit_merchant_payment RPC Error]:', error);
+    } catch (e) {
+      console.warn('[Supabase credit_merchant_payment Exception]:', e.message);
+    }
+  }
+
+  // 2. Fallback to Local Storage
+  ensureLocalStores();
+  const merchants = getStored(STORAGE_KEYS.MERCHANTS, DEFAULT_LOCAL_MERCHANTS);
+  const mIndex = merchants.findIndex(m => m.id === merchantId || m.merchant_code === merchantId);
+
+  const fee = Number((numAmount * 0.015).toFixed(2));
+  const netAmount = Number((numAmount - fee).toFixed(2));
+
+  if (mIndex !== -1) {
+    merchants[mIndex].wallet_balance = (Number(merchants[mIndex].wallet_balance) || 0) + netAmount;
+    merchants[mIndex].total_volume = (Number(merchants[mIndex].total_volume) || 0) + numAmount;
+    setStored(STORAGE_KEYS.MERCHANTS, merchants);
+  }
+
+  const tx = {
+    id: `tx_${Date.now()}`,
+    merchant_id: merchantId,
+    reference,
+    amount: numAmount,
+    fee,
+    net_amount: netAmount,
+    currency: 'NGN',
+    customer_name: customerName,
+    customer_email: customerEmail,
+    customer_phone: customerPhone,
+    purpose,
+    channel,
+    status: 'success',
+    paystack_reference: paystackReference || reference,
+    metadata,
+    paid_at: new Date().toISOString(),
+    created_at: new Date().toISOString()
+  };
+
+  const txs = getStored(STORAGE_KEYS.TRANSACTIONS, []);
+  txs.unshift(tx);
+  setStored(STORAGE_KEYS.TRANSACTIONS, txs);
+
+  return { success: true, transaction: tx, net_credited: netAmount };
+}
+
+/**
+ * Super Admin: Fetch all withdrawals across all merchants
+ */
+export async function getAllWithdrawals() {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .select(`
+          *,
+          merchant:merchants (
+            id,
+            business_name,
+            merchant_code,
+            email,
+            phone
+          )
+        `)
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (e) {
+      console.warn('[Supabase All Withdrawals Fetch Warning]:', e.message);
+    }
+  }
+
+  ensureLocalStores();
+  const withdrawals = getStored(STORAGE_KEYS.WITHDRAWALS, []);
+  const merchants = getStored(STORAGE_KEYS.MERCHANTS, DEFAULT_LOCAL_MERCHANTS);
+  return withdrawals.map(w => {
+    const m = merchants.find(mer => mer.id === w.merchant_id || mer.merchant_code === w.merchant_id);
+    return {
+      ...w,
+      merchant: m ? {
+        id: m.id,
+        business_name: m.business_name,
+        merchant_code: m.merchant_code,
+        email: m.email,
+        phone: m.phone
+      } : null
+    };
+  });
+}
+
+/**
+ * Super Admin: Mark a withdrawal request as completed (disbursed by human admin)
+ */
+export async function completeWithdrawal({ withdrawalId, proofReference, adminNotes = '', adminName = 'Ocubyte Central Admin' }) {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('complete_merchant_withdrawal', {
+        p_withdrawal_id: withdrawalId,
+        p_proof_reference: proofReference || `TRF-MANUAL-${Date.now()}`,
+        p_admin_notes: adminNotes,
+        p_admin_name: adminName
+      });
+      if (!error && data && data.success) return { success: true, ...data };
+    } catch (e) {
+      console.warn('[Supabase Complete Withdrawal RPC Warning]:', e.message);
+    }
+  }
+
+  ensureLocalStores();
+  const withdrawals = getStored(STORAGE_KEYS.WITHDRAWALS, []);
+  const idx = withdrawals.findIndex(w => w.id === withdrawalId || w.reference === withdrawalId);
+  if (idx !== -1) {
+    withdrawals[idx].status = 'completed';
+    withdrawals[idx].proof_reference = proofReference || `TRF-MANUAL-${Date.now()}`;
+    withdrawals[idx].admin_notes = adminNotes;
+    withdrawals[idx].processed_by = adminName;
+    withdrawals[idx].processed_at = new Date().toISOString();
+    setStored(STORAGE_KEYS.WITHDRAWALS, withdrawals);
+    return { success: true, message: 'Withdrawal marked as completed.' };
+  }
+  return { success: false, error: 'Withdrawal not found' };
+}
+
+/**
+ * Super Admin: Decline a withdrawal and refund merchant wallet balance
+ */
+export async function declineWithdrawal({ withdrawalId, reason = 'Bank details mismatch', adminName = 'Ocubyte Central Admin' }) {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('decline_merchant_withdrawal', {
+        p_withdrawal_id: withdrawalId,
+        p_reason: reason,
+        p_admin_name: adminName
+      });
+      if (!error && data && data.success) return { success: true, ...data };
+    } catch (e) {
+      console.warn('[Supabase Decline Withdrawal RPC Warning]:', e.message);
+    }
+  }
+
+  ensureLocalStores();
+  const withdrawals = getStored(STORAGE_KEYS.WITHDRAWALS, []);
+  const idx = withdrawals.findIndex(w => w.id === withdrawalId || w.reference === withdrawalId);
+  if (idx !== -1) {
+    const wth = withdrawals[idx];
+    wth.status = 'declined';
+    wth.admin_notes = reason;
+    wth.processed_by = adminName;
+    wth.processed_at = new Date().toISOString();
+    setStored(STORAGE_KEYS.WITHDRAWALS, withdrawals);
+
+    // Refund merchant balance
+    const merchants = getStored(STORAGE_KEYS.MERCHANTS, DEFAULT_LOCAL_MERCHANTS);
+    const mIdx = merchants.findIndex(m => m.id === wth.merchant_id);
+    if (mIdx !== -1) {
+      merchants[mIdx].wallet_balance += Number(wth.amount);
+      setStored(STORAGE_KEYS.MERCHANTS, merchants);
+    }
+
+    return { success: true, message: 'Withdrawal declined and balance refunded.' };
+  }
+  return { success: false, error: 'Withdrawal not found' };
+}
+
+/**
+ * Super Admin: Fetch all transactions across the entire platform
+ */
+export async function getAllTransactions() {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          merchant:merchants (
+            id,
+            business_name,
+            merchant_code
+          )
+        `)
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (e) {
+      console.warn('[Supabase All Transactions Fetch Warning]:', e.message);
+    }
+  }
+
+  ensureLocalStores();
+  const txs = getStored(STORAGE_KEYS.TRANSACTIONS, []);
+  const merchants = getStored(STORAGE_KEYS.MERCHANTS, DEFAULT_LOCAL_MERCHANTS);
+  return txs.map(t => {
+    const m = merchants.find(mer => mer.id === t.merchant_id || mer.id === t.merchantId);
+    return {
+      ...t,
+      merchant: m ? { id: m.id, business_name: m.business_name, merchant_code: m.merchant_code } : null
+    };
+  });
+}
+

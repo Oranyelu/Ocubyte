@@ -40,8 +40,13 @@ if (!connectionString) {
 
 console.log('Connecting to Supabase PostgreSQL at:', connectionString.replace(/:[^:@]+@/, ':****@'));
 
+const parsedUrl = new URL(connectionString);
 const client = new pg.Client({
-  connectionString,
+  user: decodeURIComponent(parsedUrl.username),
+  password: decodeURIComponent(parsedUrl.password),
+  host: parsedUrl.hostname,
+  port: parsedUrl.port ? Number(parsedUrl.port) : 5432,
+  database: parsedUrl.pathname ? parsedUrl.pathname.replace(/^\//, '') : 'postgres',
   ssl: {
     rejectUnauthorized: false
   }

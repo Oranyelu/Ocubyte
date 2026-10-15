@@ -18,7 +18,11 @@ import {
   Check,
   AlertTriangle,
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw,
+  Copy,
+  UserCheck,
+  FileText
 } from 'lucide-react';
 import { 
   initializePaystackPayment, 
@@ -31,7 +35,12 @@ import {
   generateReference
 } from '../utils/paystack';
 import Button from '../components/Button';
-import { getMerchantByCode } from '../lib/supabase';
+import PaymentReceipt from '../components/PaymentReceipt';
+import { 
+  getPublicMerchantsSummary, 
+  getMerchantByCode, 
+  creditMerchantPayment 
+} from '../lib/supabase';
 
 const SERVICE_PACKAGES = [
   {
@@ -71,40 +80,61 @@ const SERVICE_PACKAGES = [
   }
 ];
 
+// Helper to generate official Merchant Reference Number (MRN)
+function generateMRN(merchantCode = 'MCH') {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const cleanCode = merchantCode.replace(/[^A-Za-z0-9]/g, '').substring(0, 6).toUpperCase();
+  return `MRN-${dateStr}-${cleanCode}-${rand}`;
+}
+
 const PayPage = () => {
   const [searchParams] = useSearchParams();
 
-  // Obeag & Third-Party Inbound Query Parameters (Section 3 of Contract)
+  // Inbound Query Parameters
   const paramRef = searchParams.get('reference');
   const paramAmount = searchParams.get('amount');
   const paramCurrency = (searchParams.get('currency') || 'NGN').toUpperCase();
   const paramEmail = searchParams.get('email');
   const paramName = searchParams.get('name');
-  const paramPurpose = searchParams.get('purpose'); // 'WALLET_FUNDING' | 'DUE_PAYMENT'
+  const paramPurpose = searchParams.get('purpose');
   const paramCallbackUrl = searchParams.get('callback_url');
   const paramSignature = searchParams.get('signature');
-  const paramApp = searchParams.get('app'); // 'obeag'
+  const paramApp = searchParams.get('app');
   const paramUserId = searchParams.get('userId') || searchParams.get('user_id');
   const paramDueIds = searchParams.get('due_ids');
   const paramDescription = searchParams.get('description');
   const paramMerchantCode = searchParams.get('merchant_code') || searchParams.get('merchant_id');
 
-  const [merchantProfile, setMerchantProfile] = useState(null);
   const isObeagSession = (paramApp === 'obeag' || paramPurpose || paramRef?.startsWith('OCUBYTE_') || paramMerchantCode === 'obeag_portal') && !!paramRef && !!paramAmount;
+
+  // Payment Mode: 'merchant_mrn' vs 'ocubyte_agency'
+  const [payMode, setPayMode] = useState(
+    paramMerchantCode || isObeagSession ? 'merchant_mrn' : 'merchant_mrn'
+  );
+
+  // Merchant List & Selection
+  const [publicMerchants, setPublicMerchants] = useState([]);
+  const [selectedMerchantCode, setSelectedMerchantCode] = useState(paramMerchantCode || 'obeag_portal');
+  const [selectedMerchantDetails, setSelectedMerchantDetails] = useState(null);
+
+  // MRN State
+  const [mrnNumber, setMrnNumber] = useState(
+    paramRef || generateMRN(paramMerchantCode || 'OBEAG')
+  );
+  const [copiedMRN, setCopiedMRN] = useState(false);
 
   // Form State
   const [selectedService, setSelectedService] = useState('custom');
   const [currency, setCurrency] = useState(paramCurrency);
-  const [amount, setAmount] = useState(paramAmount ? Number(paramAmount) : 50000);
+  const [amount, setAmount] = useState(paramAmount ? Number(paramAmount) : 25000);
   const [clientName, setClientName] = useState(paramName || '');
   const [email, setEmail] = useState(paramEmail || '');
   const [phone, setPhone] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState(paramRef || '');
-  const [notes, setNotes] = useState(paramDescription || '');
+  const [purposeDescription, setPurposeDescription] = useState(paramDescription || paramPurpose || 'Merchant Payment');
 
-  // Signature validation state
+  // Security / verification state
   const [sigValidation, setSigValidation] = useState({ checked: false, valid: true });
-
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedTx, setCompletedTx] = useState(null);
   const [callbackRedirectUrl, setCallbackRedirectUrl] = useState(null);
@@ -114,6 +144,31 @@ const PayPage = () => {
   const [customKeyInput, setCustomKeyInput] = useState('');
   const [activeKey, setActiveKey] = useState('');
   const [recentTransactions, setRecentTransactions] = useState([]);
+
+  // Load public merchants safely (NO bank accounts, NO balances exposed)
+  useEffect(() => {
+    getPublicMerchantsSummary().then((list) => {
+      setPublicMerchants(list || []);
+      if (list && list.length > 0 && !paramMerchantCode) {
+        // default to first merchant or obeag
+        const defaultMch = list.find(m => m.merchant_code === 'obeag_portal') || list[0];
+        setSelectedMerchantCode(defaultMch.merchant_code);
+      }
+    });
+  }, [paramMerchantCode]);
+
+  // When merchant selection changes, regenerate MRN
+  useEffect(() => {
+    if (selectedMerchantCode && !paramRef) {
+      setMrnNumber(generateMRN(selectedMerchantCode));
+    }
+    // Fetch merchant details (safe info)
+    if (selectedMerchantCode) {
+      getMerchantByCode(selectedMerchantCode).then((m) => {
+        setSelectedMerchantDetails(m);
+      });
+    }
+  }, [selectedMerchantCode, paramRef]);
 
   useEffect(() => {
     setActiveKey(getPaystackPublicKey());
@@ -144,34 +199,14 @@ const PayPage = () => {
     }
   }, [isObeagSession, paramRef, paramAmount, paramSignature]);
 
-  // Load Merchant Profile if merchant_code is provided
-  useEffect(() => {
-    if (paramMerchantCode) {
-      getMerchantByCode(paramMerchantCode).then(m => {
-        if (m) setMerchantProfile(m);
-      });
-    }
-  }, [paramMerchantCode]);
-
-  const handleSelectPackage = (pkg) => {
-    if (isObeagSession) return; // Amount is locked for Obeag
-    setSelectedService(pkg.id);
-    if (pkg.id !== 'custom') {
-      setAmount(pkg.defaultAmount);
-    }
+  const handleCopyMRN = () => {
+    navigator.clipboard.writeText(mrnNumber);
+    setCopiedMRN(true);
+    setTimeout(() => setCopiedMRN(false), 2000);
   };
 
-  const handleSaveKey = () => {
-    if (customKeyInput.trim()) {
-      setPaystackPublicKey(customKeyInput.trim());
-      setActiveKey(customKeyInput.trim());
-      alert('Custom Paystack Public Key saved successfully!');
-    } else {
-      resetPaystackPublicKey();
-      setActiveKey(getPaystackPublicKey());
-      alert('Reset to default Paystack Key.');
-    }
-    setSettingsOpen(false);
+  const handleRegenerateMRN = () => {
+    setMrnNumber(generateMRN(selectedMerchantCode || 'MCH'));
   };
 
   // Helper to generate the exact callback URL with HMAC SHA-256 signature
@@ -183,7 +218,7 @@ const PayPage = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'generate_callback',
-          reference: paramRef || invoiceNumber,
+          reference: paramRef || mrnNumber,
           amount: amount,
           purpose: paramPurpose || 'WALLET_FUNDING',
           status: txStatus
@@ -193,7 +228,7 @@ const PayPage = () => {
       const sig = data.signature || 'ocu_sig_contract_verified';
 
       const url = new URL(paramCallbackUrl, window.location.origin);
-      url.searchParams.set('reference', paramRef || invoiceNumber);
+      url.searchParams.set('reference', paramRef || mrnNumber);
       url.searchParams.set('status', txStatus);
       url.searchParams.set('amount', String(amount));
       url.searchParams.set('purpose', paramPurpose || 'WALLET_FUNDING');
@@ -201,7 +236,7 @@ const PayPage = () => {
       return url.toString();
     } catch {
       const url = new URL(paramCallbackUrl, window.location.origin);
-      url.searchParams.set('reference', paramRef || invoiceNumber);
+      url.searchParams.set('reference', paramRef || mrnNumber);
       url.searchParams.set('status', txStatus);
       url.searchParams.set('amount', String(amount));
       url.searchParams.set('purpose', paramPurpose || 'WALLET_FUNDING');
@@ -212,48 +247,34 @@ const PayPage = () => {
 
   const handlePaymentSuccess = async (tx) => {
     setIsProcessing(false);
-    setCompletedTx(tx);
+    setCompletedTx({
+      ...tx,
+      reference: mrnNumber || tx.reference,
+      merchantName: selectedMerchantDetails?.business_name || (isObeagSession ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Ocubyte Software')
+    });
     setRecentTransactions(getRecordedTransactions());
 
-    // Synchronize merchant earnings to Supabase / local wallet store
-    const targetMerchantCode = paramMerchantCode || (isObeagSession ? 'obeag_portal' : 'ocubyte_direct');
-    if (targetMerchantCode) {
-      try {
-        const m = await getMerchantByCode(targetMerchantCode);
-        if (m) {
-          const feePercent = m.fee_percent || 1.5;
-          const fee = Number(amount) * (feePercent / 100);
-          const netCredit = Number(amount) - fee;
-          m.wallet_balance = (Number(m.wallet_balance) || 0) + netCredit;
-          m.total_volume = (Number(m.total_volume) || 0) + Number(amount);
-
-          const stored = JSON.parse(localStorage.getItem('ocubyte_merchants_store') || '[]');
-          const idx = stored.findIndex(sm => sm.id === m.id || sm.merchant_code === m.merchant_code);
-          if (idx !== -1) {
-            stored[idx] = m;
-            localStorage.setItem('ocubyte_merchants_store', JSON.stringify(stored));
-          }
-
-          // Record in merchant transactions store
-          const merchantTxs = JSON.parse(localStorage.getItem('ocubyte_transactions_store') || '[]');
-          merchantTxs.unshift({
-            id: `tx_${Date.now()}`,
-            merchant_id: m.id,
-            reference: tx?.reference || paramRef || invoiceNumber,
-            amount: Number(amount),
-            fee: fee,
-            net_amount: netCredit,
-            customer_name: clientName || 'Customer',
-            customer_email: email,
-            purpose: paramPurpose || notes || 'Payment',
-            status: 'success',
-            paid_at: new Date().toISOString()
-          });
-          localStorage.setItem('ocubyte_transactions_store', JSON.stringify(merchantTxs));
+    // Synchronize payment into Supabase and credit merchant's wallet atomically
+    const targetMerchantId = selectedMerchantDetails?.id || selectedMerchantCode || (isObeagSession ? 'obeag_portal' : 'ocubyte_direct');
+    try {
+      await creditMerchantPayment({
+        merchantId: targetMerchantId,
+        amount: Number(amount),
+        reference: mrnNumber || tx.reference,
+        customerName: clientName || 'Verified Customer',
+        customerEmail: email,
+        customerPhone: phone,
+        purpose: purposeDescription,
+        channel: tx.channel || 'paystack_inline',
+        paystackReference: tx.reference || tx.trxref,
+        metadata: {
+          mrn: mrnNumber,
+          merchant_code: selectedMerchantCode,
+          purpose: purposeDescription
         }
-      } catch (syncErr) {
-        console.warn('[Merchant Wallet Sync Warning]:', syncErr.message);
-      }
+      });
+    } catch (creditErr) {
+      console.warn('[Credit Merchant Wallet Warning]:', creditErr.message);
     }
 
     if (paramCallbackUrl) {
@@ -277,17 +298,16 @@ const PayPage = () => {
 
   const handleDirectPayment = async (isSandbox = false) => {
     if (!email || !email.includes('@')) {
-      alert('Please enter a valid email address.');
+      alert('Please enter a valid customer email address.');
       return;
     }
     if (!amount || Number(amount) <= 0) {
-      alert('Please enter a valid amount.');
+      alert('Please enter a valid payment amount.');
       return;
     }
 
-    const currentRef = paramRef || (invoiceNumber.trim() ? `INV_${invoiceNumber.trim()}_${Date.now().toString(36)}` : generateReference('OCU'));
-    const merchantId = isObeagSession ? 'obeag_portal' : 'ocubyte_direct';
-    const merchantName = isObeagSession ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Ocubyte Studio';
+    const currentRef = mrnNumber || paramRef || generateReference('MRN');
+    const targetMerchantName = selectedMerchantDetails?.business_name || (isObeagSession ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Ocubyte Studio');
 
     setIsProcessing(true);
 
@@ -298,9 +318,9 @@ const PayPage = () => {
           amount,
           currency,
           reference: currentRef,
-          customerName: clientName,
-          merchantId,
-          merchantName
+          customerName: clientName || 'Verified Customer',
+          merchantId: selectedMerchantCode,
+          merchantName: targetMerchantName
         });
         await handlePaymentSuccess(tx);
       }, 700);
@@ -313,31 +333,22 @@ const PayPage = () => {
         amount: Number(amount),
         currency,
         reference: currentRef,
-        customerName: clientName,
-        merchantId,
-        merchantName,
+        customerName: clientName || 'Customer',
+        merchantId: selectedMerchantCode,
+        merchantName: targetMerchantName,
         metadata: {
-          app: isObeagSession ? (paramApp || 'obeag') : 'ocubyte',
-          purpose: paramPurpose || 'GENERAL_PAYMENT',
-          userId: paramUserId || '',
-          due_ids: paramDueIds || '',
-          description: paramDescription || notes,
-          callback_url: paramCallbackUrl,
+          app: isObeagSession ? (paramApp || 'obeag') : 'ocubyte_mrn',
+          mrn: currentRef,
+          merchant_code: selectedMerchantCode,
+          purpose: purposeDescription,
           customer_name: clientName,
-          invoice_number: invoiceNumber
+          customer_phone: phone
         },
         onSuccess: async (tx) => {
           await handlePaymentSuccess(tx);
         },
-        onCancel: async () => {
+        onCancel: () => {
           setIsProcessing(false);
-          if (isObeagSession && paramCallbackUrl) {
-            const cancelConfirm = confirm('You cancelled checkout. Do you want to return to Obeag Portal?');
-            if (cancelConfirm) {
-              const cancelUrl = await buildObeagCallbackUrl('cancelled');
-              if (cancelUrl) window.location.href = cancelUrl;
-            }
-          }
         },
         onError: (err) => {
           setIsProcessing(false);
@@ -351,90 +362,45 @@ const PayPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 py-12 max-w-6xl space-y-12">
-      {/* Merchant Specialized Header when custom merchant is active */}
-      {merchantProfile && !isObeagSession ? (
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
-            <Building2 className="w-4 h-4 text-emerald-400" />
-            <span>Paying to: {merchantProfile.business_name} • Ocubyte Gateway</span>
-          </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-text">
-            {paramDescription || 'Merchant Invoice Checkout'}
-          </h1>
-          <p className="text-muted text-sm sm:text-base max-w-xl mx-auto">
-            Payment for <strong className="text-text">{merchantProfile.business_name}</strong> via Ocubyte Hosted Remita-Grade Gateway.
-          </p>
+    <div className="container mx-auto px-4 sm:px-6 py-12 max-w-6xl space-y-10">
+      
+      {/* Top Header Banner */}
+      <div className="text-center space-y-4 max-w-3xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent/10 border border-accent/20 text-accent">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Ocubyte Remita-Grade Customer Payment Gateway</span>
         </div>
-      ) : isObeagSession ? (
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-600/15 border border-blue-500/30 text-blue-300">
-            <Users className="w-4 h-4 text-accent" />
-            <span>OHA BU ENYI AGE GRADE (OBEAG) • Secured Payment Contract</span>
-          </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-text">
-            {paramPurpose === 'DUE_PAYMENT' ? 'Pay Annual Dues & Levies' : 'Digital Wallet Funding'}
-          </h1>
-          <p className="text-muted text-sm sm:text-base max-w-xl mx-auto">
-            Authorized transaction for <strong className="text-text">{clientName || email}</strong> via Ocubyte Hosted Payment Gateway & Paystack.
-          </p>
 
-          {/* HMAC Signature Audit Badge */}
-          {paramSignature && (
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-primary/60 border border-slate-800 text-xs text-muted">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>HMAC SHA-256 Contract Signature:</span>
-              <span className="font-mono text-emerald-400 font-semibold">
-                {sigValidation.valid ? 'Verified Authenticity' : 'Signature Unchecked'}
-              </span>
-            </div>
-          )}
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-text">
+          Direct Customer Payment Portal
+        </h1>
+
+        <p className="text-muted text-sm sm:text-base max-w-2xl mx-auto">
+          Pay any registered merchant or business directly on Ocubyte with a generated <strong className="text-text">Merchant Reference Number (MRN)</strong>. No account or login required.
+        </p>
+
+        {/* Quick Toolbar */}
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <button 
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs text-muted hover:text-text hover:bg-slate-800/40 transition"
+          >
+            <span className={`w-2 h-2 rounded-full ${activeKey?.startsWith('pk_live') ? 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse' : 'bg-amber-400'}`} />
+            <Key className="w-3.5 h-3.5 text-accent" />
+            <span className="font-semibold text-text">
+              {activeKey?.startsWith('pk_live') ? 'Paystack LIVE Mode' : 'Paystack Test Mode'}
+            </span>
+          </button>
+
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700/80 hover:border-accent text-xs text-muted hover:text-text transition"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Merchant / Admin Login</span>
+          </Link>
         </div>
-      ) : (
-        /* Standard Header */
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent/10 border border-accent/20 text-accent">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Paystack Certified 256-Bit SSL Checkout</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-            Pay with <span className="text-accent">Paystack</span>
-          </h1>
-          <p className="text-muted text-base sm:text-lg">
-            Securely settle project milestones, custom invoices, or retainers directly with Ocubyte.
-          </p>
-
-          {/* Quick Toolbar */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button 
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs text-muted hover:text-text hover:bg-slate-800/40 transition"
-            >
-              <span className={`w-2 h-2 rounded-full ${activeKey?.startsWith('pk_live') ? 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse' : 'bg-amber-400'}`} />
-              <Key className="w-3.5 h-3.5 text-accent" />
-              <span className="font-semibold text-text">
-                {activeKey?.startsWith('pk_live') ? 'Paystack LIVE Mode' : 'Paystack Test Mode'}
-              </span>
-            </button>
-
-            <button 
-              onClick={() => setHistoryOpen(!historyOpen)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs text-muted hover:text-text hover:bg-slate-800/40 transition"
-            >
-              <History className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Past Receipts ({recentTransactions.length})</span>
-            </button>
-
-            <Link
-              to="/gateway"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-accent/30 bg-accent/5 text-xs text-accent hover:bg-accent/10 transition"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Affiliate Gateway Portal</span>
-            </Link>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Main Payment Section */}
       <AnimatePresence mode="wait">
@@ -446,14 +412,6 @@ const PayPage = () => {
                   <span className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                   <span>Redirecting to Obeag Portal in {countdown}s...</span>
                 </div>
-                <div className="w-full bg-primary/50 h-1.5 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: '100%' }}
-                    animate={{ width: '0%' }}
-                    transition={{ duration: 5, ease: 'linear' }}
-                    className="h-full bg-accent"
-                  />
-                </div>
               </div>
             )}
 
@@ -461,242 +419,241 @@ const PayPage = () => {
               transaction={completedTx} 
               onDone={() => setCompletedTx(null)}
               returnUrl={callbackRedirectUrl}
-              returnUrlText={isObeagSession ? 'Return to Obeag Portal Now' : 'Done'}
+              returnUrlText={isObeagSession ? 'Return to Obeag Portal Now' : 'Make Another Payment'}
             />
           </div>
         ) : (
           <div className="grid lg:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Details */}
+            
+            {/* Left Column: Form & MRN Details */}
             <div className="lg:col-span-7 space-y-6">
-              
-              {/* Obeag Transaction Purpose Card */}
-              {isObeagSession ? (
-                <div className="bg-secondary/80 border border-blue-900/50 rounded-3xl p-6 backdrop-blur-md space-y-4 shadow-xl">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-700/60">
-                    <span className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
-                      <Users className="w-4 h-4 text-accent" />
-                      <span>Obeag Member Transaction Profile</span>
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400">
-                      S2S Pre-Registered
-                    </span>
-                  </div>
 
-                  <div className="grid sm:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3 rounded-xl bg-primary/40 border border-slate-800 space-y-1">
-                      <span className="text-muted">Transaction Purpose</span>
-                      <div className="font-bold text-accent">
-                        {paramPurpose === 'DUE_PAYMENT' ? 'Dues & Levies Settlement' : 'Digital Wallet Funding'}
-                      </div>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-primary/40 border border-slate-800 space-y-1">
-                      <span className="text-muted">Transaction Reference</span>
-                      <div className="font-mono font-bold text-text truncate" title={paramRef}>
-                        {paramRef}
-                      </div>
-                    </div>
-
-                    {paramUserId && (
-                      <div className="p-3 rounded-xl bg-primary/40 border border-slate-800 space-y-1">
-                        <span className="text-muted">Member ID</span>
-                        <div className="font-mono text-text">{paramUserId}</div>
-                      </div>
-                    )}
-
-                    {paramDueIds && (
-                      <div className="p-3 rounded-xl bg-primary/40 border border-slate-800 space-y-1">
-                        <span className="text-muted">Assessment Due IDs</span>
-                        <div className="font-mono text-text truncate">{paramDueIds}</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {paramDescription && (
-                    <div className="p-3 rounded-xl bg-primary/30 border border-slate-800 text-xs text-muted">
-                      <strong className="text-text">Description:</strong> {paramDescription}
-                    </div>
-                  )}
+              {/* Mode Toggle: Pay a Merchant (MRN) vs Agency Services */}
+              {!isObeagSession && (
+                <div className="grid grid-cols-2 p-1 bg-slate-900/90 border border-slate-800 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setPayMode('merchant_mrn')}
+                    className={`py-3 text-xs sm:text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 ${
+                      payMode === 'merchant_mrn'
+                        ? 'bg-accent text-primary shadow-md'
+                        : 'text-text/70 hover:text-text'
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4" />
+                    <span>Pay a Merchant (MRN)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayMode('ocubyte_agency')}
+                    className={`py-3 text-xs sm:text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 ${
+                      payMode === 'ocubyte_agency'
+                        ? 'bg-accent text-primary shadow-md'
+                        : 'text-text/70 hover:text-text'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Ocubyte Agency Services</span>
+                  </button>
                 </div>
-              ) : (
-                /* Standard Package Selector */
-                <div className="bg-secondary/60 border border-slate-700/60 rounded-3xl p-6 backdrop-blur-md space-y-4">
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-accent" />
-                    <span>Choose Service or Payment Purpose</span>
-                  </h2>
-                  
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {SERVICE_PACKAGES.map((pkg) => {
-                      const isSelected = selectedService === pkg.id;
-                      return (
-                        <button
-                          key={pkg.id}
-                          type="button"
-                          onClick={() => handleSelectPackage(pkg)}
-                          className={`text-left p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
-                            isSelected 
-                              ? 'bg-accent/10 border-accent shadow-md shadow-accent/10' 
-                              : 'bg-primary/30 border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{pkg.icon}</span>
-                            <span className="font-bold text-sm text-text">{pkg.name}</span>
-                          </div>
-                          <p className="text-xs text-muted mt-2 line-clamp-2">{pkg.desc}</p>
-                          {pkg.id !== 'custom' && (
-                            <div className="mt-3 text-xs font-semibold text-accent font-mono">
-                              {formatCurrency(pkg.defaultAmount)}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
+              )}
+
+              {/* SECTION: MRN GENERATOR BOX */}
+              {payMode === 'merchant_mrn' && (
+                <div className="bg-[#090d16]/90 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+                      <Receipt className="w-4 h-4" />
+                      <span>Merchant Reference Number (MRN)</span>
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      No Login Required
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-muted leading-relaxed">
+                    Every payment to a merchant receives a unique Merchant Reference Number (MRN). This guarantees that your payment is automatically allocated to the merchant's financial records.
+                  </p>
+
+                  {/* MRN Display Bar */}
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] uppercase font-semibold text-muted">Your Official Reference</div>
+                      <div className="text-base sm:text-lg font-mono font-black text-amber-300 tracking-wide mt-0.5">
+                        {mrnNumber}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleCopyMRN}
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-text transition text-xs font-semibold flex items-center gap-1"
+                        title="Copy MRN"
+                      >
+                        {copiedMRN ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedMRN ? 'Copied' : 'Copy'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRegenerateMRN}
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-text transition text-xs font-semibold flex items-center gap-1"
+                        title="Regenerate MRN"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-accent" />
+                        <span>Regenerate</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Merchant Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-text/80 mb-1.5">
+                      Select Recipient Business / Merchant <span className="text-accent">*</span>
+                    </label>
+                    <select
+                      value={selectedMerchantCode}
+                      onChange={(e) => setSelectedMerchantCode(e.target.value)}
+                      className="w-full px-4 py-3 bg-secondary/80 border border-slate-800 rounded-xl text-text text-sm font-semibold focus:outline-none focus:border-accent"
+                    >
+                      {publicMerchants.map((m) => (
+                        <option key={m.id} value={m.merchant_code} className="bg-slate-900 text-text">
+                          {m.business_name} ({m.merchant_code})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedMerchantDetails && (
+                      <div className="text-[11px] text-muted mt-1.5 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Verified Merchant: <strong className="text-text">{selectedMerchantDetails.business_name}</strong></span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Client Details Form */}
-              <div className="bg-secondary/60 border border-slate-700/60 rounded-3xl p-6 backdrop-blur-md space-y-4">
-                <h2 className="text-lg font-bold text-text">
-                  {isObeagSession ? 'Member Credentials' : 'Client Information'}
+              {/* Customer Details Form */}
+              <div className="bg-[#090d16]/90 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-4">
+                <h2 className="text-base font-bold text-text flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-accent" />
+                  <span>Customer Information</span>
                 </h2>
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted">Full Name</label>
+                    <label className="text-xs font-semibold text-muted">Customer Full Name</label>
                     <input
                       type="text"
-                      readOnly={isObeagSession && !!paramName}
+                      placeholder="e.g. Chukwuma Okafor"
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
-                      className={`w-full bg-primary/50 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent ${
-                        isObeagSession && !!paramName ? 'opacity-80 cursor-not-allowed' : ''
-                      }`}
+                      className="w-full bg-secondary/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted">Email Address *</label>
+                    <label className="text-xs font-semibold text-muted">Email Address (For Receipt) *</label>
                     <input
                       type="email"
                       required
-                      readOnly={isObeagSession && !!paramEmail}
+                      placeholder="chukwuma@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className={`w-full bg-primary/50 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent ${
-                        isObeagSession && !!paramEmail ? 'opacity-80 cursor-not-allowed' : ''
-                      }`}
+                      className="w-full bg-secondary/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent"
                     />
                   </div>
 
-                  {!isObeagSession && (
-                    <>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-muted">Phone Number (Optional)</label>
-                        <input
-                          type="tel"
-                          placeholder="e.g. +234 801 234 5678"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full bg-primary/50 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent"
-                        />
-                      </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted">Phone Number (Optional)</label>
+                    <input
+                      type="tel"
+                      placeholder="+234 800 000 0000"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-secondary/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent"
+                    />
+                  </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-muted">Invoice # or Quote ID</label>
-                        <input
-                          type="text"
-                          value={invoiceNumber}
-                          onChange={(e) => setInvoiceNumber(e.target.value)}
-                          className="w-full bg-primary/50 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent font-mono"
-                        />
-                      </div>
-                    </>
-                  )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted">Payment Purpose / Description</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Annual Dues 2026 or Invoice Milestone"
+                      value={purposeDescription}
+                      onChange={(e) => setPurposeDescription(e.target.value)}
+                      className="w-full bg-secondary/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-text focus:outline-none focus:border-accent"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Right Column: Amount & Paystack Checkout Summary */}
             <div className="lg:col-span-5 space-y-6">
-              <div className="bg-secondary/80 border border-slate-700/80 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-6 sticky top-28">
-                <div className="flex justify-between items-center border-b border-slate-700/60 pb-4">
+              <div className="bg-[#090d16]/90 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-6 sticky top-28">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-4">
                   <h3 className="font-bold text-lg text-text">Payment Summary</h3>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/60 border border-slate-800 text-xs font-mono font-bold text-accent">
                     <span>{currency}</span>
                   </div>
                 </div>
 
-                {/* Amount Input (Locked if Obeag session to satisfy Security Best Practice 3) */}
+                {/* Amount Input */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-muted">Amount Due</label>
-                    {isObeagSession && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                        <Lock className="w-3 h-3" />
-                        Amount Locked by Obeag
-                      </span>
-                    )}
-                  </div>
-
+                  <label className="text-xs font-semibold text-muted">Amount to Pay</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-muted">
-                      {currency === 'USD' ? '$' : '₦'}
+                      ₦
                     </span>
                     <input
                       type="number"
-                      readOnly={isObeagSession}
+                      min="100"
                       value={amount}
-                      onChange={(e) => !isObeagSession && setAmount(Number(e.target.value))}
-                      className={`w-full bg-primary/60 border border-slate-700 rounded-2xl pl-10 pr-4 py-3.5 text-2xl font-extrabold text-accent focus:outline-none font-mono ${
-                        isObeagSession ? 'opacity-90 cursor-not-allowed border-blue-500/30' : 'focus:border-accent'
-                      }`}
+                      onChange={(e) => setAmount(Number(e.target.value))}
+                      className="w-full bg-primary/60 border border-slate-700 rounded-2xl pl-10 pr-4 py-3.5 text-2xl font-extrabold text-accent focus:outline-none font-mono focus:border-accent"
                     />
                   </div>
 
-                  {/* Preset buttons only shown for standard custom payments */}
-                  {!isObeagSession && (
-                    <div className="grid grid-cols-4 gap-2 pt-1">
-                      {[25000, 50000, 100000, 250000].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setAmount(preset)}
-                          className="py-1.5 rounded-lg border border-slate-800 bg-primary/30 text-[11px] font-mono text-muted hover:text-accent hover:border-accent/40 transition"
-                        >
-                          ₦{(preset / 1000)}k
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* Preset Quick Chips */}
+                  <div className="grid grid-cols-4 gap-2 pt-1">
+                    {[10000, 25000, 50000, 100000].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setAmount(preset)}
+                        className="py-1.5 rounded-lg border border-slate-800 bg-primary/30 text-[11px] font-mono text-muted hover:text-accent hover:border-accent/40 transition"
+                      >
+                        ₦{(preset / 1000)}k
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Fee & Total Breakdown */}
-                <div className="space-y-2 text-sm border-t border-slate-700/60 pt-4">
+                {/* Breakdown */}
+                <div className="space-y-2 text-sm border-t border-slate-800 pt-4">
                   <div className="flex justify-between text-muted text-xs">
-                    <span>Base Amount</span>
-                    <span className="font-mono">{formatCurrency(amount, currency)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted text-xs">
-                    <span>Processing Fee (Paystack)</span>
-                    <span className="font-mono text-emerald-400">Included (0.00)</span>
-                  </div>
-                  <div className="flex justify-between text-muted text-xs">
-                    <span>S2S Fraud & Tamper Protection</span>
-                    <span className="text-accent font-semibold flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Active (HMAC SHA-256)
+                    <span>Merchant Reference (MRN)</span>
+                    <span className="font-mono text-amber-300 font-bold truncate max-w-[200px]" title={mrnNumber}>
+                      {mrnNumber}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-lg font-extrabold text-text pt-2 border-t border-slate-700/40">
+                  <div className="flex justify-between text-muted text-xs">
+                    <span>Receiving Merchant</span>
+                    <span className="text-text font-semibold">
+                      {selectedMerchantDetails?.business_name || selectedMerchantCode}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-muted text-xs">
+                    <span>Processing Fee</span>
+                    <span className="font-mono text-emerald-400">Included (₦0.00)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-lg font-extrabold text-text pt-2 border-t border-slate-800">
                     <span>Total Due</span>
                     <span className="text-accent text-xl font-mono">{formatCurrency(amount, currency)}</span>
                   </div>
                 </div>
 
-                {/* Paystack Primary Button */}
+                {/* Checkout Buttons */}
                 <div className="space-y-3 pt-2">
                   <button
                     type="button"
@@ -712,12 +669,11 @@ const PayPage = () => {
                     ) : (
                       <>
                         <Lock className="w-4 h-4" />
-                        <span>Pay {formatCurrency(amount, currency)} via Paystack</span>
+                        <span>Pay {formatCurrency(amount, currency)} with Paystack</span>
                       </>
                     )}
                   </button>
 
-                  {/* Sandbox Instant Simulation Button */}
                   <button
                     type="button"
                     disabled={isProcessing}
@@ -725,20 +681,20 @@ const PayPage = () => {
                     className="w-full py-2.5 px-4 rounded-xl border border-slate-700/80 hover:bg-slate-800/50 text-muted hover:text-text text-xs font-semibold transition flex items-center justify-center gap-2"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Instant Sandbox Simulation (Test Mode)</span>
+                    <span>Instant Sandbox Simulation (Test Payment)</span>
                   </button>
                 </div>
 
                 {/* Trust Badges */}
-                <div className="flex items-center justify-center gap-4 pt-2 text-[11px] text-muted border-t border-slate-700/40">
+                <div className="flex items-center justify-center gap-4 pt-2 text-[11px] text-muted border-t border-slate-800">
                   <div className="flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-accent" />
-                    <span>Paystack PCI-DSS Vault</span>
+                    <span>Paystack Certified</span>
                   </div>
                   <span>•</span>
                   <span>Instant Receipt</span>
                   <span>•</span>
-                  <span>Zero-Trust Model</span>
+                  <span>Zero-Trust Ledger</span>
                 </div>
               </div>
             </div>

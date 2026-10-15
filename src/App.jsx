@@ -13,6 +13,8 @@ import GatewayPortal from './pages/GatewayPortal';
 import GatewayCheckout from './pages/GatewayCheckout';
 import GatewayDemoCallback from './pages/GatewayDemoCallback';
 import MerchantPortal from './pages/MerchantPortal';
+import AuthPortal from './pages/AuthPortal';
+import MasterAdminPortal from './pages/MasterAdminPortal';
 import NotFound from './pages/NotFound';
 
 const App = () => {
@@ -30,7 +32,10 @@ const App = () => {
         <Route path="/gateway" element={<GatewayPortal />} />
         <Route path="/gateway/checkout" element={<GatewayCheckout />} />
         <Route path="/gateway/demo-callback" element={<GatewayDemoCallback />} />
+        <Route path="/login" element={<AuthPortal />} />
+        <Route path="/admin" element={<MasterAdminPortal />} />
         <Route path="/merchant" element={<MerchantPortal />} />
+        <Route path="/merchant/dashboard" element={<MerchantPortal />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

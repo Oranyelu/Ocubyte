@@ -32,12 +32,18 @@ CREATE TABLE IF NOT EXISTS public.merchants (
     fee_percent NUMERIC(5, 2) NOT NULL DEFAULT 1.50, -- Gateway processing fee percentage (e.g. 1.5%)
     
     -- Merchant Status & Metadata
+    password_hash TEXT,                          -- SHA-256 password hash for secure merchant login
+    role TEXT NOT NULL DEFAULT 'merchant',       -- 'merchant' or 'super_admin'
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'pending_kyc', 'suspended')),
     webhook_url TEXT,
     callback_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
+
+-- Ensure migration compatibility for existing tables
+ALTER TABLE public.merchants ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE public.merchants ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'merchant';
 
 -- Indexes for lightning fast lookups
 CREATE INDEX IF NOT EXISTS idx_merchants_code ON public.merchants(merchant_code);

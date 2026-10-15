@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { cn } from '../utils/cn';
 import ThemeSwitcher from './ThemeSwitcher';
-import { Menu, X, CreditCard } from 'lucide-react';
+import { Menu, X, CreditCard, UserCheck, ShieldAlert, LogOut, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getCurrentSession, logout } from '../lib/auth';
 
 const Navbar = () => {
   const { theme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    setSession(getCurrentSession());
+  }, [location.pathname]);
 
   // Map theme to logo SVG
   const logoSrc = {
@@ -25,10 +32,15 @@ const Navbar = () => {
     { name: 'Projects', path: '/projects' },
     { name: 'Automation', path: '/automation' },
     { name: 'Payment Gateway', path: '/gateway' },
-    { name: 'Merchants', path: '/merchant' },
     { name: 'Design Studio', path: '/studio' },
     { name: 'Contact', path: '/contact' }
   ];
+
+  const handleLogout = () => {
+    logout();
+    setSession(null);
+    navigate('/login', { replace: true });
+  };
 
   return (
     <nav
@@ -78,6 +90,7 @@ const Navbar = () => {
         {/* Action Controls */}
         <div className="hidden xl:flex items-center gap-3">
           <ThemeSwitcher />
+          
           <Link
             to="/pay"
             className="px-4 py-2 rounded-full text-xs font-semibold border border-slate-700/80 hover:border-accent text-text hover:text-accent transition-all duration-300 flex items-center gap-1.5"
@@ -85,9 +98,48 @@ const Navbar = () => {
             <CreditCard className="w-3.5 h-3.5 text-accent" />
             <span>Pay Online</span>
           </Link>
+
+          {/* Authenticated Session vs Login */}
+          {session ? (
+            <div className="flex items-center gap-2">
+              {session.role === 'super_admin' ? (
+                <Link
+                  to="/admin"
+                  className="px-4 py-2 rounded-full text-xs font-bold bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition flex items-center gap-1.5"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>HQ Admin</span>
+                </Link>
+              ) : (
+                <Link
+                  to="/merchant/dashboard"
+                  className="px-4 py-2 rounded-full text-xs font-bold bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition flex items-center gap-1.5"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Dashboard</span>
+                </Link>
+              )}
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-full border border-slate-700/80 hover:border-rose-500 text-muted hover:text-rose-400 transition"
+                title="Log Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="px-4 py-2 rounded-full text-xs font-semibold border border-accent/30 bg-accent/10 text-accent hover:bg-accent hover:text-primary transition-all duration-300 flex items-center gap-1.5"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </Link>
+          )}
+
           <Link
             to="/contact"
-            className="px-5 py-2 rounded-full text-xs font-semibold border border-accent/20 bg-accent/10 text-accent hover:bg-accent hover:text-primary transition-all duration-300"
+            className="px-5 py-2 rounded-full text-xs font-semibold border border-slate-700 bg-secondary/80 text-text hover:border-accent transition-all duration-300"
           >
             Start Project
           </Link>
@@ -133,6 +185,7 @@ const Navbar = () => {
                   </Link>
                 );
               })}
+
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <Link
                   to="/pay"
@@ -140,15 +193,27 @@ const Navbar = () => {
                   className="text-center px-4 py-3 rounded-xl border border-slate-700 bg-secondary text-text font-bold text-sm hover:border-accent hover:text-accent transition-all flex items-center justify-center gap-1.5"
                 >
                   <CreditCard className="w-4 h-4 text-accent" />
-                  <span>Pay Online</span>
+                  <span>Pay with MRN</span>
                 </Link>
-                <Link
-                  to="/contact"
-                  onClick={() => setIsOpen(false)}
-                  className="text-center px-4 py-3 rounded-xl bg-accent text-primary font-bold text-sm shadow-lg shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center"
-                >
-                  Start Project
-                </Link>
+
+                {session ? (
+                  <Link
+                    to={session.role === 'super_admin' ? '/admin' : '/merchant/dashboard'}
+                    onClick={() => setIsOpen(false)}
+                    className="text-center px-4 py-3 rounded-xl bg-accent text-primary font-bold text-sm shadow-lg shadow-accent/20 transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>{session.role === 'super_admin' ? 'HQ Admin' : 'Dashboard'}</span>
+                  </Link>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="text-center px-4 py-3 rounded-xl bg-accent text-primary font-bold text-sm shadow-lg shadow-accent/20 transition flex items-center justify-center gap-1.5"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Sign In</span>
+                  </Link>
+                )}
               </div>
             </div>
           </motion.div>

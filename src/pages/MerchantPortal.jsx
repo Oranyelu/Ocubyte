@@ -1,46 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Building2, Wallet, ArrowDownRight, ArrowUpRight, ShieldCheck, 
   Copy, Check, ExternalLink, RefreshCw, Key, Landmark, 
   Clock, AlertCircle, FileText, PlusCircle, CheckCircle2, ChevronRight,
-  Send, DollarSign, Download, Lock, Eye, EyeOff, Sparkles, UserCheck
+  Send, DollarSign, Download, Lock, Eye, EyeOff, Sparkles, UserCheck,
+  LogOut, CreditCard, Link2
 } from 'lucide-react';
 import { 
-  getAllMerchants, 
   getMerchantByCode, 
-  registerMerchant, 
   requestWithdrawal, 
   getMerchantWithdrawals, 
   getMerchantTransactions,
+  supabase,
   isSupabaseConfigured 
 } from '../lib/supabase';
-
-// Popular Nigerian banks
-const NIGERIAN_BANKS = [
-  'Access Bank',
-  'Zenith Bank',
-  'Guaranty Trust Bank (GTBank)',
-  'First Bank of Nigeria',
-  'United Bank for Africa (UBA)',
-  'Kuda Bank',
-  'OPay',
-  'Moniepoint MFB',
-  'Stanbic IBTC Bank',
-  'Fidelity Bank',
-  'First City Monument Bank (FCMB)',
-  'Union Bank of Nigeria',
-  'Sterling Bank',
-  'Wema Bank / ALAT',
-  'Ecobank Nigeria',
-  'Polaris Bank',
-  'Jaiz Bank'
-];
+import { getCurrentSession, logout } from '../lib/auth';
+import Button from '../components/Button';
 
 export default function MerchantPortal() {
-  const [merchants, setMerchants] = useState([]);
+  const navigate = useNavigate();
+  const session = getCurrentSession();
+
+  // Authentication Guard
+  useEffect(() => {
+    if (!session) {
+      navigate('/login', { replace: true });
+    } else if (session.role === 'super_admin') {
+      navigate('/admin', { replace: true });
+    }
+  }, [session, navigate]);
+
   const [activeMerchant, setActiveMerchant] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'withdrawals', 'transactions', 'api_keys', 'register'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'withdrawals', 'transactions', 'api_keys'
   
   // Data State
   const [withdrawals, setWithdrawals] = useState([]);
@@ -62,40 +55,45 @@ export default function MerchantPortal() {
   const [linkTitle, setLinkTitle] = useState('Services Invoice');
   const [generatedLink, setGeneratedLink] = useState('');
 
-  // Register Form State
-  const [regForm, setRegForm] = useState({
-    business_name: '',
-    email: '',
-    phone: '',
-    bank_name: 'Zenith Bank',
-    account_number: '',
-    account_name: ''
-  });
-  const [regSubmitting, setRegSubmitting] = useState(false);
-  const [regSuccess, setRegSuccess] = useState(null);
-
-  // Load merchants on mount
+  // Load this specific merchant on mount
   useEffect(() => {
-    loadAllMerchants();
+    if (session?.role === 'merchant') {
+      loadMerchantProfile();
+    }
   }, []);
 
-  // When active merchant changes, load their withdrawals and transactions
-  useEffect(() => {
-    if (activeMerchant) {
-      loadMerchantFinancials(activeMerchant.id || activeMerchant.merchant_code);
-    }
-  }, [activeMerchant]);
-
-  const loadAllMerchants = async () => {
+  const loadMerchantProfile = async () => {
     setLoading(true);
     try {
-      const list = await getAllMerchants();
-      setMerchants(list);
-      if (list.length > 0 && !activeMerchant) {
-        setActiveMerchant(list[0]);
+      const merchantId = session?.user?.id || session?.merchantId;
+      const merchantCode = session?.user?.merchant_code;
+      const merchantEmail = session?.user?.email;
+
+      let merchant = null;
+
+      // 1. Try Supabase
+      if (isSupabaseConfigured && supabase) {
+        if (merchantId) {
+          const { data } = await supabase.from('merchants').select('*').eq('id', merchantId).single();
+          if (data) merchant = data;
+        }
+        if (!merchant && merchantEmail) {
+          const { data } = await supabase.from('merchants').select('*').eq('email', merchantEmail).single();
+          if (data) merchant = data;
+        }
+      }
+
+      // 2. Fallback to getMerchantByCode
+      if (!merchant && (merchantCode || merchantId)) {
+        merchant = await getMerchantByCode(merchantCode || merchantId);
+      }
+
+      if (merchant) {
+        setActiveMerchant(merchant);
+        await loadMerchantFinancials(merchant.id);
       }
     } catch (e) {
-      console.error('Error loading merchants:', e);
+      console.error('Error loading merchant profile:', e);
     } finally {
       setLoading(false);
     }
@@ -120,6 +118,11 @@ export default function MerchantPortal() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   // Handle Withdrawal Submission
   const handleWithdrawSubmit = async (e) => {
     e.preventDefault();
@@ -131,1114 +134,718 @@ export default function MerchantPortal() {
       return;
     }
 
-    if (num > activeMerchant.wallet_balance) {
-      alert(`Insufficient balance. Available: ₦${activeMerchant.wallet_balance.toLocaleString()}`);
+    if (num > Number(activeMerchant.wallet_balance)) {
+      alert(`Insufficient balance. Available: ₦${Number(activeMerchant.wallet_balance).toLocaleString()}`);
       return;
     }
 
     setIsSubmittingWithdraw(true);
     try {
       const res = await requestWithdrawal({
-        merchantId: activeMerchant.id || activeMerchant.merchant_code,
+        merchantId: activeMerchant.id,
         amount: num,
-        notes: withdrawNotes
+        notes: withdrawNotes.trim()
       });
 
       if (res.success) {
-        setWithdrawSuccessData(res.withdrawal || res);
-        // Refresh merchant data
-        const updated = await getMerchantByCode(activeMerchant.merchant_code);
-        if (updated) setActiveMerchant(updated);
-        loadMerchantFinancials(activeMerchant.id || activeMerchant.merchant_code);
+        setWithdrawSuccessData(res.withdrawal);
+        setWithdrawModalOpen(false);
         setWithdrawAmount('');
         setWithdrawNotes('');
+        await loadMerchantProfile(); // Refresh balance and list
       } else {
         alert(res.error || 'Failed to submit withdrawal request.');
       }
     } catch (err) {
-      alert(err.message || 'Error communicating with server.');
+      alert(err.message || 'Error submitting withdrawal');
     } finally {
       setIsSubmittingWithdraw(false);
     }
   };
 
-  // Handle Merchant Registration
-  const handleRegisterSubmit = async (e) => {
+  // Generate Customer Direct Payment Link (with MRN support)
+  const handleGenerateLink = (e) => {
     e.preventDefault();
-    if (!regForm.business_name || !regForm.email || !regForm.account_number || !regForm.account_name) {
-      alert('Please fill out all required fields.');
-      return;
-    }
-
-    if (regForm.account_number.length !== 10) {
-      alert('Please enter a valid 10-digit Nigerian NUBAN account number.');
-      return;
-    }
-
-    setRegSubmitting(true);
-    try {
-      const res = await registerMerchant(regForm);
-      if (res.success) {
-        setRegSuccess(res.merchant);
-        await loadAllMerchants();
-        setActiveMerchant(res.merchant);
-        setRegForm({
-          business_name: '',
-          email: '',
-          phone: '',
-          bank_name: 'Zenith Bank',
-          account_number: '',
-          account_name: ''
-        });
-      } else {
-        alert(res.error || 'Registration failed.');
-      }
-    } catch (err) {
-      alert(err.message || 'Error registering business.');
-    } finally {
-      setRegSubmitting(false);
-    }
-  };
-
-  // Build Payment Link
-  const generatePaymentLink = () => {
+    if (!activeMerchant) return;
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.ocubyte.org';
-    const link = `${origin}/pay?merchant_code=${encodeURIComponent(activeMerchant?.merchant_code || 'ocubyte_direct')}&amount=${linkAmount}&description=${encodeURIComponent(linkTitle)}&app=merchant_link`;
-    setGeneratedLink(link);
-    setLinkModalOpen(true);
+    const mrnSlug = `MRN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const url = `${origin}/pay?merchant_code=${encodeURIComponent(activeMerchant.merchant_code)}&amount=${encodeURIComponent(linkAmount)}&description=${encodeURIComponent(linkTitle)}&reference=${mrnSlug}`;
+    setGeneratedLink(url);
   };
 
-  const transferFee = 50.00;
-  const requestedNum = Number(withdrawAmount) || 0;
-  const netPayoutAmount = Math.max(0, requestedNum - transferFee);
+  if (!session || session.role !== 'merchant') {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-[#08090d] text-white pt-24 pb-20 selection:bg-[#3ecf8e] selection:text-black">
-      {/* Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-10 left-1/4 w-[600px] h-[600px] bg-[#3ecf8e]/10 rounded-full blur-[140px]" />
-        <div className="absolute bottom-10 right-1/4 w-[500px] h-[500px] bg-[#3b82f6]/10 rounded-full blur-[140px]" />
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen pt-24 pb-20 px-4 bg-background text-text">
+      <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Supabase Status Banner */}
-        <div className={`mb-6 p-4 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 backdrop-blur-xl transition ${
-          isSupabaseConfigured 
-            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-400' 
-            : 'bg-amber-950/20 border-amber-500/30 text-amber-300'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${isSupabaseConfigured ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
-              <ShieldCheck className="h-5 w-5" />
+        {/* Top Merchant Authenticated Banner */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-[#090d16]/90 border border-slate-800 rounded-3xl backdrop-blur-xl shadow-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+              <Building2 className="w-6 h-6 text-cyan-400" />
             </div>
             <div>
-              <div className="font-bold text-sm tracking-wide flex items-center gap-2">
-                {isSupabaseConfigured ? 'Supabase Backend Connected' : 'Supabase Integration Ready (Local Fallback Active)'}
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                  isSupabaseConfigured ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                }`}>
-                  {isSupabaseConfigured ? 'LIVE DATABASE' : 'AWAITING SUPABASE URL & KEYS'}
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-text">
+                  {activeMerchant?.business_name || session.user.business_name || 'Merchant Dashboard'}
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[10px] font-extrabold uppercase tracking-wider">
+                  Verified Merchant
                 </span>
               </div>
-              <p className="text-xs text-white/60 mt-0.5">
-                {isSupabaseConfigured 
-                  ? 'All merchants, transactions, and withdrawal alerts are permanently synchronized with PostgreSQL.' 
-                  : 'Add VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY to .env to connect your Supabase database.'}
+              <p className="text-xs text-muted mt-0.5">
+                Merchant Code: <span className="font-mono text-cyan-300 font-bold">{activeMerchant?.merchant_code || session.user.merchant_code}</span> &bull; {activeMerchant?.email || session.user.email}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-mono text-white/40">SQL Schema:</span>
-            <code className="px-2 py-1 bg-white/5 border border-white/10 rounded font-mono text-[11px] text-white/80">
-              supabase/schema.sql
-            </code>
-          </div>
-        </div>
 
-        {/* Header & Merchant Switcher */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8 border-b border-white/10 pb-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3ecf8e]/10 border border-[#3ecf8e]/20 text-[#3ecf8e] text-xs font-mono font-medium mb-3">
-              <Building2 className="h-3.5 w-3.5" />
-              <span>REMITA-GRADE MERCHANT PAYMENT GATEWAY</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Merchant Settlement Portal
-            </h1>
-            <p className="text-sm text-white/60 mt-1 max-w-2xl">
-              Register your business, accept customer payments online, track revenue in real-time, and request bank payouts fulfilled by Ocubyte Finance.
-            </p>
-          </div>
-
-          {/* Merchant Selector & Quick Switch */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#12141c] border border-white/10 rounded-2xl px-3.5 py-2">
-              <Building2 className="h-4 w-4 text-[#3ecf8e]" />
-              <div className="text-xs">
-                <span className="text-white/40 block text-[10px] uppercase font-mono">Active Business</span>
-                <select
-                  value={activeMerchant?.id || ''}
-                  onChange={(e) => {
-                    const found = merchants.find(m => m.id === e.target.value);
-                    if (found) setActiveMerchant(found);
-                  }}
-                  className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer pr-4"
-                >
-                  {merchants.map(m => (
-                    <option key={m.id} value={m.id} className="bg-[#12141c] text-white">
-                      {m.business_name} ({m.merchant_code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
+          <div className="flex items-center gap-3 shrink-0">
             <button
-              onClick={() => setActiveTab('register')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-bold text-white transition hover:border-[#3ecf8e]/40"
+              onClick={loadMerchantProfile}
+              disabled={loading}
+              className="p-2.5 rounded-xl border border-slate-700/80 hover:border-accent text-muted hover:text-text transition flex items-center gap-1.5 text-xs font-semibold"
+              title="Refresh Data"
             >
-              <PlusCircle className="h-4 w-4 text-[#3ecf8e]" />
-              Register Business
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-accent' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={() => { setLinkModalOpen(true); setGeneratedLink(''); }}
+              className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-accent text-text hover:text-accent text-xs font-semibold transition flex items-center gap-1.5"
+            >
+              <Link2 className="w-3.5 h-3.5 text-accent" />
+              <span>Customer Link (MRN)</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex overflow-x-auto space-x-2 border-b border-white/10 pb-3 mb-8 no-scrollbar">
-          {[
-            { id: 'overview', label: 'Financial Overview', icon: Wallet },
-            { id: 'withdrawals', label: 'Withdrawals & Payouts', icon: ArrowUpRight, badge: withdrawals.filter(w => w.status === 'pending_review').length },
-            { id: 'transactions', label: 'Transactions Ledger', icon: FileText, badge: transactions.length },
-            { id: 'api_keys', label: 'API Keys & Integration', icon: Key },
-            { id: 'register', label: '+ Register New Business', icon: Building2 },
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
+        {/* Financial Metrics Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Available Wallet Balance */}
+          <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl relative overflow-hidden group">
+            <div className="flex items-center justify-between text-muted text-xs font-semibold mb-2">
+              <span>Available Wallet Balance</span>
+              <Wallet className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
+              ₦{Number(activeMerchant?.wallet_balance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-[11px] text-muted">Ready for bank withdrawal</span>
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                  isActive
-                    ? 'bg-[#3ecf8e] text-black shadow-lg shadow-[#3ecf8e]/20'
-                    : 'text-white/70 hover:text-white hover:bg-white/5'
-                }`}
+                onClick={() => setWithdrawModalOpen(true)}
+                className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
               >
-                <Icon className="h-4 w-4" />
-                <span>{tab.label}</span>
-                {Boolean(tab.badge) && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                    isActive ? 'bg-black text-[#3ecf8e]' : 'bg-[#3ecf8e]/20 text-[#3ecf8e]'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
+                <span>Request Payout</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
-            );
-          })}
+            </div>
+          </div>
+
+          {/* Card 2: Total Volume Processed */}
+          <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl">
+            <div className="flex items-center justify-between text-muted text-xs font-semibold mb-2">
+              <span>Total Processed Volume</span>
+              <ArrowDownRight className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-text tracking-tight">
+              ₦{Number(activeMerchant?.total_volume || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[11px] text-muted mt-2">
+              Gross customer payments through Ocubyte
+            </div>
+          </div>
+
+          {/* Card 3: Settlement Bank Account */}
+          <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl">
+            <div className="flex items-center justify-between text-muted text-xs font-semibold mb-2">
+              <span>Settlement Bank Account</span>
+              <Landmark className="w-4 h-4 text-accent" />
+            </div>
+            <div className="font-bold text-text text-sm">
+              {activeMerchant?.bank_name || 'Bank not set'}
+            </div>
+            <div className="font-mono text-xs text-amber-300 font-bold mt-1">
+              {activeMerchant?.account_number}
+            </div>
+            <div className="text-[11px] text-muted truncate mt-0.5">
+              {activeMerchant?.account_name}
+            </div>
+          </div>
+
+          {/* Card 4: Fee Rate & Protection */}
+          <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl">
+            <div className="flex items-center justify-between text-muted text-xs font-semibold mb-2">
+              <span>Gateway Fee Rate</span>
+              <ShieldCheck className="w-4 h-4 text-accent" />
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-text tracking-tight">
+              {activeMerchant?.fee_percent || '1.50'}%
+            </div>
+            <div className="text-[11px] text-muted mt-2 flex items-center gap-1">
+              <span className="text-emerald-400 font-bold">Live</span> &bull; ₦50 flat transfer fee on payouts
+            </div>
+          </div>
         </div>
 
-        {/* TAB 1: OVERVIEW */}
-        {activeTab === 'overview' && activeMerchant && (
-          <div className="space-y-8">
-            {/* Top 4 KPI Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              
-              {/* Card 1: Available Wallet Balance */}
-              <div className="relative p-6 rounded-3xl bg-gradient-to-br from-[#121622] to-[#0d1017] border border-[#3ecf8e]/30 shadow-xl overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#3ecf8e]/10 rounded-full blur-2xl group-hover:bg-[#3ecf8e]/20 transition" />
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-mono uppercase tracking-wider text-[#3ecf8e]">Available Balance</span>
-                  <div className="p-2 rounded-xl bg-[#3ecf8e]/10 text-[#3ecf8e]">
-                    <Wallet className="h-5 w-5" />
+        {/* Central Navigation Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-4 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'overview'
+                ? 'bg-accent text-primary shadow-lg shadow-accent/20'
+                : 'text-text/70 hover:text-text hover:bg-slate-900/60'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            <span>Balance & Payouts</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('transactions')}
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'transactions'
+                ? 'bg-accent text-primary shadow-lg shadow-accent/20'
+                : 'text-text/70 hover:text-text hover:bg-slate-900/60'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Customer Payments ({transactions.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('withdrawals')}
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'withdrawals'
+                ? 'bg-accent text-primary shadow-lg shadow-accent/20'
+                : 'text-text/70 hover:text-text hover:bg-slate-900/60'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Withdrawal History ({withdrawals.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('api_keys')}
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'api_keys'
+                ? 'bg-accent text-primary shadow-lg shadow-accent/20'
+                : 'text-text/70 hover:text-text hover:bg-slate-900/60'
+            }`}
+          >
+            <Key className="w-4 h-4" />
+            <span>API Keys & Credentials</span>
+          </button>
+        </div>
+
+        {/* TAB 1: OVERVIEW & PAYOUTS */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Action & Quick Info */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Quick Customer MRN Payment Link Card */}
+              <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl relative overflow-hidden">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-text">Customer Payment Reference (MRN)</h3>
+                    <p className="text-xs text-muted">Customers do NOT need an account to pay your business</p>
                   </div>
                 </div>
-                <div className="text-3xl font-black text-white tracking-tight">
-                  ₦{Number(activeMerchant.wallet_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                <p className="text-xs text-text/80 leading-relaxed mb-4">
+                  Provide your customers with your unique Merchant Code (<span className="font-mono font-bold text-accent">{activeMerchant?.merchant_code}</span>) or generate a pre-filled invoice link. Customers simply open Ocubyte Pay, generate an official Merchant Reference Number (MRN), and pay instantly via Card, USSD, or Bank Transfer.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => { setLinkModalOpen(true); setGeneratedLink(''); }}
+                    className="px-4 py-2.5 rounded-xl bg-accent text-primary font-bold text-xs hover:opacity-90 transition flex items-center gap-1.5"
+                  >
+                    <Link2 className="w-4 h-4" />
+                    <span>Generate Invoice Payment Link</span>
+                  </button>
+                  <Link
+                    to={`/pay?merchant_code=${encodeURIComponent(activeMerchant?.merchant_code || '')}`}
+                    target="_blank"
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-text hover:border-accent text-xs font-semibold transition flex items-center gap-1.5"
+                  >
+                    <span>Open Public Payment Page</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
-                <p className="text-[11px] text-white/50 mt-1">Ready for direct bank withdrawal</p>
-                
+              </div>
+
+              {/* Settlement Bank Details Card */}
+              <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl">
+                <h3 className="text-sm font-bold text-text mb-2 flex items-center gap-2">
+                  <Landmark className="w-4 h-4 text-accent" />
+                  <span>Verified Settlement Bank Account</span>
+                </h3>
+                <p className="text-xs text-muted mb-4">
+                  Payouts requested from your wallet balance are reviewed and transferred directly to this Nigerian bank account by Ocubyte live treasury personnel.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                  <div>
+                    <div className="text-[10px] uppercase font-semibold text-muted">Bank Name</div>
+                    <div className="text-xs font-bold text-text mt-0.5">{activeMerchant?.bank_name}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-semibold text-muted">Account Number (NUBAN)</div>
+                    <div className="text-xs font-mono font-bold text-amber-300 mt-0.5">{activeMerchant?.account_number}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-semibold text-muted">Account Holder</div>
+                    <div className="text-xs font-semibold text-text mt-0.5 truncate">{activeMerchant?.account_name}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Col: Instant Withdrawal Card */}
+            <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-accent mb-2">
+                  <Wallet className="w-4 h-4" />
+                  <span>Request Bank Transfer</span>
+                </div>
+                <h3 className="text-base font-bold text-text mb-1">Live Human Payout</h3>
+                <p className="text-xs text-muted mb-4">
+                  Enter an amount to withdraw. The request is sent to Ocubyte Finance for direct bank transfer fulfillment.
+                </p>
+
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 mb-4 space-y-1">
+                  <div className="text-[11px] text-muted">Current Wallet Balance:</div>
+                  <div className="text-xl font-black text-emerald-400">
+                    ₦{Number(activeMerchant?.wallet_balance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+
                 <button
                   onClick={() => setWithdrawModalOpen(true)}
-                  disabled={Number(activeMerchant.wallet_balance) <= 50}
-                  className="mt-5 w-full py-2.5 px-4 bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-[#3ecf8e]/20 flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-3 rounded-xl bg-accent text-primary font-bold text-xs hover:opacity-90 transition flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
                 >
-                  <ArrowUpRight className="h-4 w-4" />
-                  Request Withdrawal
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>Request Withdrawal to Bank</span>
                 </button>
               </div>
 
-              {/* Card 2: Total Volume Processed */}
-              <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10 shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-mono uppercase tracking-wider text-white/50">Total Lifetime Volume</span>
-                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
-                    <DollarSign className="h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-3xl font-black text-white tracking-tight">
-                  ₦{Number(activeMerchant.total_volume || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <p className="text-[11px] text-white/50 mt-1">Processed across Paystack & Gateway</p>
-                <div className="mt-5 flex items-center gap-2 text-xs text-blue-400 font-mono">
-                  <span>Fee rate: {activeMerchant.fee_percent || 1.5}%</span>
-                </div>
+              <div className="mt-6 pt-4 border-t border-slate-800/80 text-[11px] text-muted flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-accent shrink-0" />
+                <span>Zero-Trust cryptographic financial ledger</span>
               </div>
-
-              {/* Card 3: Destination Settlement Account */}
-              <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10 shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-mono uppercase tracking-wider text-white/50">Settlement Bank</span>
-                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
-                    <Landmark className="h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-lg font-bold text-white truncate">
-                  {activeMerchant.bank_name}
-                </div>
-                <div className="text-xl font-mono font-bold text-[#3ecf8e] mt-1 tracking-wider">
-                  {activeMerchant.account_number}
-                </div>
-                <p className="text-xs text-white/70 truncate mt-1">
-                  {activeMerchant.account_name}
-                </p>
-              </div>
-
-              {/* Card 4: Payout Fulfillment Mode */}
-              <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10 shadow-lg flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono uppercase tracking-wider text-white/50">Disbursement Method</span>
-                    <div className="p-2 rounded-xl bg-emerald-500/10 text-[#3ecf8e]">
-                      <UserCheck className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <div className="text-sm font-bold text-white">
-                    Live Human Payout Desk
-                  </div>
-                  <p className="text-[11px] text-white/50 mt-1">
-                    Withdrawal requests trigger instant notifications to Ocubyte Finance officers for manual corporate bank transfer.
-                  </p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-                  <span className="text-white/40">Status:</span>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400 font-mono text-[11px]">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    DESK ACTIVE
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Quick Actions & Integration Links */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Payment Link Card */}
-              <div className="p-6 rounded-3xl bg-gradient-to-br from-[#121622] to-[#12141c] border border-white/10 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-xs font-mono text-[#3ecf8e] mb-2">
-                    <Sparkles className="h-4 w-4" />
-                    <span>INSTANT REMITA-STYLE PAYMENT LINK</span>
-                  </div>
-                  <h3 className="text-lg font-extrabold text-white">Generate Payment Link</h3>
-                  <p className="text-xs text-white/60 mt-1">
-                    Share a direct checkout link with your customers via WhatsApp, Email, or SMS to receive funds straight to your merchant wallet.
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-white/10 space-y-3">
-                  <button
-                    onClick={generatePaymentLink}
-                    className="w-full py-2.5 px-4 bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition"
-                  >
-                    <ExternalLink className="h-4 w-4 text-[#3ecf8e]" />
-                    Create Instant Link
-                  </button>
-                </div>
-              </div>
-
-              {/* Developer Integration Card */}
-              <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10 flex flex-col justify-between lg:col-span-2">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-xs font-mono text-purple-400">
-                      <Key className="h-4 w-4" />
-                      <span>LIVE CREDENTIALS</span>
-                    </div>
-                    <button
-                      onClick={() => setActiveTab('api_keys')}
-                      className="text-xs text-[#3ecf8e] hover:underline font-mono"
-                    >
-                      View Full Docs &rarr;
-                    </button>
-                  </div>
-                  <h3 className="text-lg font-extrabold text-white">Merchant Integration Details</h3>
-                  <p className="text-xs text-white/60 mt-1">
-                    Use these credentials to accept payments programmatically from your website or application.
-                  </p>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-[10px] font-mono text-white/40 uppercase block">Merchant Code</span>
-                    <div className="flex items-center justify-between mt-1">
-                      <code className="text-xs font-mono text-white font-bold">{activeMerchant.merchant_code}</code>
-                      <button
-                        onClick={() => copyToClipboard(activeMerchant.merchant_code, 'mcode')}
-                        className="text-white/40 hover:text-white"
-                      >
-                        {copiedKey === 'mcode' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-                    <span className="text-[10px] font-mono text-white/40 uppercase block">Public Key</span>
-                    <div className="flex items-center justify-between mt-1">
-                      <code className="text-xs font-mono text-white font-bold truncate max-w-[180px]">{activeMerchant.public_key}</code>
-                      <button
-                        onClick={() => copyToClipboard(activeMerchant.public_key, 'pubkey')}
-                        className="text-white/40 hover:text-white"
-                      >
-                        {copiedKey === 'pubkey' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-white/50">
-                  <span>Target Checkout Endpoint:</span>
-                  <code className="font-mono text-[11px] text-[#3ecf8e]">https://www.ocubyte.org/pay</code>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Recent Activity Feeds */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Recent Withdrawals Feed */}
-              <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-[#3ecf8e]" />
-                    Recent Withdrawal Requests
-                  </h3>
-                  <button onClick={() => setActiveTab('withdrawals')} className="text-xs text-[#3ecf8e] hover:underline font-mono">
-                    View All ({withdrawals.length})
-                  </button>
-                </div>
-
-                {withdrawals.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-white/40">
-                    No withdrawal requests submitted yet.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {withdrawals.slice(0, 3).map((wth) => (
-                      <div key={wth.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs text-white">₦{Number(wth.amount).toLocaleString()}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase ${
-                              wth.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' :
-                              wth.status === 'pending_review' ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/20 text-blue-300'
-                            }`}>
-                              {wth.status.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <p className="text-[10px] font-mono text-white/40 mt-1">Ref: {wth.reference} &bull; {new Date(wth.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <div className="text-right text-xs text-white/70">
-                          <span className="font-mono text-white/40 block text-[10px]">Net to Bank</span>
-                          <span className="font-mono font-bold text-[#3ecf8e]">₦{Number(wth.net_payout || wth.amount - 50).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Recent Inbound Customer Payments */}
-              <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                    <ArrowDownRight className="h-4 w-4 text-emerald-400" />
-                    Recent Inbound Payments
-                  </h3>
-                  <button onClick={() => setActiveTab('transactions')} className="text-xs text-[#3ecf8e] hover:underline font-mono">
-                    View Ledger ({transactions.length})
-                  </button>
-                </div>
-
-                {transactions.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-white/40">
-                    No transactions recorded yet for this merchant.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {transactions.slice(0, 3).map((tx) => (
-                      <div key={tx.id || tx.reference} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs text-white">₦{Number(tx.amount).toLocaleString()}</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-300">
-                              {tx.status || 'success'}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-white/40 mt-1">{tx.customer_name || tx.customerName || 'Customer'} &bull; {tx.customer_email || tx.customerEmail}</p>
-                        </div>
-                        <div className="text-right text-xs">
-                          <span className="font-mono text-white/40 block text-[10px]">Ref</span>
-                          <span className="font-mono text-[11px] text-white/70 truncate max-w-[120px] inline-block">{tx.reference}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
             </div>
           </div>
         )}
 
-        {/* TAB 2: WITHDRAWALS & PAYOUTS */}
-        {activeTab === 'withdrawals' && activeMerchant && (
-          <div className="space-y-6">
-            <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* TAB 2: CUSTOMER PAYMENTS TRANSACTIONS */}
+        {activeTab === 'transactions' && (
+          <div className="bg-[#090d16]/80 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-xl">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white">Merchant Withdrawals & Settlement Ledger</h2>
-                <p className="text-xs text-white/60 mt-1">
-                  Every withdrawal is logged with high-fidelity financial audit tracking and sent to Ocubyte Finance for manual live disbursement.
-                </p>
+                <h3 className="text-sm font-bold text-text">Customer Payment Transactions</h3>
+                <p className="text-xs text-muted">All payments made to {activeMerchant?.business_name} with Merchant Reference Numbers</p>
+              </div>
+              <span className="text-xs text-muted font-mono">{transactions.length} Records</span>
+            </div>
+
+            {transactions.length === 0 ? (
+              <div className="p-12 text-center text-muted text-xs">
+                No customer payments recorded yet. Share your payment link to start receiving funds.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/90 text-muted uppercase text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Reference (MRN)</th>
+                      <th className="py-3 px-4">Customer</th>
+                      <th className="py-3 px-4">Gross Paid</th>
+                      <th className="py-3 px-4">Gateway Fee</th>
+                      <th className="py-3 px-4">Net Credited</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-slate-900/40 transition">
+                        <td className="py-3.5 px-4 font-bold text-text">{tx.reference}</td>
+                        <td className="py-3.5 px-4 font-sans">
+                          <div className="text-text font-medium">{tx.customer_name || 'Customer'}</div>
+                          <div className="text-[10px] text-muted">{tx.customer_email}</div>
+                        </td>
+                        <td className="py-3.5 px-4 font-black text-text">
+                          ₦{Number(tx.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4 text-rose-400">
+                          ₦{Number(tx.fee || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4 text-emerald-400 font-bold">
+                          ₦{Number(tx.net_amount || (tx.amount - (tx.fee || 0))).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4 font-sans">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            {tx.status || 'success'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-sans text-muted text-[11px]">
+                          {new Date(tx.created_at).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: WITHDRAWAL HISTORY */}
+        {activeTab === 'withdrawals' && (
+          <div className="bg-[#090d16]/80 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-xl">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-text">Bank Withdrawal Requests</h3>
+                <p className="text-xs text-muted">All withdrawal requests dispatched to Ocubyte Finance for live payout</p>
               </div>
               <button
                 onClick={() => setWithdrawModalOpen(true)}
-                className="py-2.5 px-5 bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-[#3ecf8e]/20 flex items-center gap-2 transition"
+                className="px-3.5 py-1.5 rounded-xl bg-accent text-primary text-xs font-bold hover:opacity-90 transition flex items-center gap-1"
               >
-                <ArrowUpRight className="h-4 w-4" />
-                Request New Withdrawal
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>New Request</span>
               </button>
             </div>
 
-            {/* Explanatory Callout */}
-            <div className="p-4 rounded-2xl bg-blue-950/20 border border-blue-500/30 text-blue-300 flex items-start gap-3 text-xs leading-relaxed">
-              <AlertCircle className="h-5 w-5 shrink-0 text-blue-400 mt-0.5" />
-              <div>
-                <strong className="block text-white font-semibold mb-0.5">How Ocubyte Manual Settlement Works:</strong>
-                When you initiate a withdrawal, the funds are safely deducted from your wallet balance to prevent double spending. An automated dispatch is sent to <code className="bg-black/30 px-1 py-0.5 rounded font-mono text-blue-200">payments@ocubyte.org</code> with your bank details. A live finance desk officer executes the Nigerian NIP bank transfer and updates your withdrawal with the bank reference proof.
+            {withdrawals.length === 0 ? (
+              <div className="p-12 text-center text-muted text-xs">
+                No withdrawal requests have been logged yet.
               </div>
-            </div>
-
-            {/* Withdrawals Table */}
-            <div className="rounded-3xl bg-[#12141c] border border-white/10 overflow-hidden shadow-xl">
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-white/5 border-b border-white/10 text-white/40 font-mono uppercase text-[10px]">
+                  <thead className="bg-slate-900/90 text-muted uppercase text-[10px] tracking-wider border-b border-slate-800">
                     <tr>
-                      <th className="py-3.5 px-4">Reference</th>
-                      <th className="py-3.5 px-4">Date</th>
-                      <th className="py-3.5 px-4">Gross Amount</th>
-                      <th className="py-3.5 px-4">Transfer Fee</th>
-                      <th className="py-3.5 px-4">Net Payout</th>
-                      <th className="py-3.5 px-4">Destination Bank Account</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4">Officer Proof Reference</th>
+                      <th className="py-3 px-4">Reference</th>
+                      <th className="py-3 px-4">Requested</th>
+                      <th className="py-3 px-4">Fee</th>
+                      <th className="py-3 px-4">Net Payout</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Bank Proof / Notes</th>
+                      <th className="py-3 px-4">Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {withdrawals.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="py-12 text-center text-white/40">
-                          No withdrawal records found. Click "Request New Withdrawal" to initiate your first payout.
+                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                    {withdrawals.map((w) => (
+                      <tr key={w.id} className="hover:bg-slate-900/40 transition">
+                        <td className="py-3.5 px-4 font-bold text-text">{w.reference}</td>
+                        <td className="py-3.5 px-4 font-bold text-text">
+                          ₦{Number(w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4 text-muted">
+                          ₦{Number(w.fee || 50).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4 font-black text-emerald-400">
+                          ₦{Number(w.net_payout || w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4 font-sans">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            w.status === 'completed'
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : w.status === 'declined'
+                              ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                              : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {w.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-muted text-[11px]">
+                          {w.proof_reference || w.admin_notes || 'Pending human disbursal'}
+                        </td>
+                        <td className="py-3.5 px-4 text-muted text-[11px] font-sans">
+                          {new Date(w.created_at).toLocaleDateString()}
                         </td>
                       </tr>
-                    ) : (
-                      withdrawals.map((wth) => (
-                        <tr key={wth.id} className="hover:bg-white/[0.02] transition">
-                          <td className="py-4 px-4 font-mono font-bold text-white">
-                            {wth.reference}
-                          </td>
-                          <td className="py-4 px-4 text-white/60">
-                            {new Date(wth.created_at).toLocaleString()}
-                          </td>
-                          <td className="py-4 px-4 font-bold text-white">
-                            ₦{Number(wth.amount).toLocaleString()}
-                          </td>
-                          <td className="py-4 px-4 text-white/40 font-mono">
-                            ₦{Number(wth.fee || 50).toFixed(2)}
-                          </td>
-                          <td className="py-4 px-4 font-bold text-[#3ecf8e] font-mono">
-                            ₦{Number(wth.net_payout || wth.amount - 50).toLocaleString()}
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="font-bold text-white">{wth.bank_name}</div>
-                            <div className="font-mono text-white/60 text-[11px]">{wth.account_number} ({wth.account_name})</div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase ${
-                              wth.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' :
-                              wth.status === 'pending_review' ? 'bg-amber-500/20 text-amber-300 animate-pulse' :
-                              wth.status === 'processing' ? 'bg-blue-500/20 text-blue-300' : 'bg-red-500/20 text-red-300'
-                            }`}>
-                              {wth.status.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4 font-mono text-[11px] text-white/60">
-                            {wth.proof_reference || wth.admin_notes || (
-                              <span className="text-white/30 italic">Awaiting disbursement</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* TAB 3: TRANSACTIONS LEDGER */}
-        {activeTab === 'transactions' && activeMerchant && (
-          <div className="space-y-6">
-            <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* TAB 4: API KEYS */}
+        {activeTab === 'api_keys' && (
+          <div className="p-6 rounded-3xl bg-[#090d16]/80 border border-slate-800 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-sm font-bold text-text">Ocubyte Gateway API Credentials</h3>
+              <p className="text-xs text-muted">Use these keys to integrate your website, e-commerce store, or mobile application</p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Public Key */}
               <div>
-                <h2 className="text-xl font-bold text-white">Customer Inbound Transactions</h2>
-                <p className="text-xs text-white/60 mt-1">
-                  Complete real-time log of customer payments credited directly to {activeMerchant.business_name}.
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => loadMerchantFinancials(activeMerchant.id || activeMerchant.merchant_code)}
-                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition"
-                  title="Refresh Ledger"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-[#12141c] border border-white/10 overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-white/5 border-b border-white/10 text-white/40 font-mono uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3.5 px-4">Reference</th>
-                      <th className="py-3.5 px-4">Date & Time</th>
-                      <th className="py-3.5 px-4">Customer</th>
-                      <th className="py-3.5 px-4">Purpose</th>
-                      <th className="py-3.5 px-4">Gross Amount</th>
-                      <th className="py-3.5 px-4">Platform Fee</th>
-                      <th className="py-3.5 px-4">Net Settled</th>
-                      <th className="py-3.5 px-4">Channel</th>
-                      <th className="py-3.5 px-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {transactions.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="py-12 text-center text-white/40">
-                          No transactions recorded yet. Use the Payment Link or Gateway API to receive your first payment.
-                        </td>
-                      </tr>
-                    ) : (
-                      transactions.map((tx) => {
-                        const feeAmt = tx.fee !== undefined ? Number(tx.fee) : (Number(tx.amount) * 0.015);
-                        const netAmt = tx.net_amount !== undefined ? Number(tx.net_amount) : (Number(tx.amount) - feeAmt);
-                        return (
-                          <tr key={tx.id || tx.reference} className="hover:bg-white/[0.02] transition">
-                            <td className="py-4 px-4 font-mono font-bold text-white">
-                              {tx.reference}
-                            </td>
-                            <td className="py-4 px-4 text-white/60">
-                              {new Date(tx.paid_at || tx.created_at || tx.timestamp || Date.now()).toLocaleString()}
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="font-bold text-white">{tx.customer_name || tx.customerName || 'Customer'}</div>
-                              <div className="font-mono text-white/40 text-[10px]">{tx.customer_email || tx.customerEmail}</div>
-                            </td>
-                            <td className="py-4 px-4 text-white/70">
-                              {tx.purpose || tx.title || 'Invoice Payment'}
-                            </td>
-                            <td className="py-4 px-4 font-bold text-white font-mono">
-                              ₦{Number(tx.amount).toLocaleString()}
-                            </td>
-                            <td className="py-4 px-4 font-mono text-white/40">
-                              ₦{feeAmt.toFixed(2)}
-                            </td>
-                            <td className="py-4 px-4 font-bold text-[#3ecf8e] font-mono">
-                              ₦{netAmt.toLocaleString()}
-                            </td>
-                            <td className="py-4 px-4 uppercase font-mono text-[10px] text-white/50">
-                              {tx.channel || 'CARD'}
-                            </td>
-                            <td className="py-4 px-4">
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300">
-                                {tx.status || 'success'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: API KEYS & INTEGRATION DOCS */}
-        {activeTab === 'api_keys' && activeMerchant && (
-          <div className="space-y-8">
-            <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10">
-              <h2 className="text-xl font-bold text-white">Remita-Style Developer Integration</h2>
-              <p className="text-xs text-white/60 mt-1">
-                Link any external application, website, or mobile app to Ocubyte Gateway to receive payments directly into your merchant wallet.
-              </p>
-
-              {/* API Keys Table */}
-              <div className="mt-6 space-y-4">
-                
-                {/* Merchant Code */}
-                <div className="p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 block">Merchant Code / Slug</span>
-                    <span className="font-mono font-bold text-sm text-white">{activeMerchant.merchant_code}</span>
-                  </div>
+                <label className="block text-xs font-semibold text-text/80 mb-1">
+                  Public API Key (Client-Side)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={activeMerchant?.public_key || ''}
+                    className="flex-1 px-4 py-2.5 bg-secondary/80 border border-slate-800 rounded-xl text-text font-mono text-xs focus:outline-none"
+                  />
                   <button
-                    onClick={() => copyToClipboard(activeMerchant.merchant_code, 'code_tab')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-white/80 transition"
+                    onClick={() => copyToClipboard(activeMerchant?.public_key, 'pub')}
+                    className="p-2.5 rounded-xl border border-slate-700 hover:border-accent text-text transition"
+                    title="Copy Public Key"
                   >
-                    {copiedKey === 'code_tab' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span>Copy Code</span>
+                    {copiedKey === 'pub' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-
-                {/* Public API Key */}
-                <div className="p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 block">Live Public API Key (Client-Side)</span>
-                    <span className="font-mono font-bold text-sm text-white break-all">{activeMerchant.public_key}</span>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(activeMerchant.public_key, 'pub_tab')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-white/80 transition"
-                  >
-                    {copiedKey === 'pub_tab' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span>Copy Key</span>
-                  </button>
-                </div>
-
-                {/* Secret API Key */}
-                <div className="p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400 block">Live Secret Key (Server-to-Server Only)</span>
-                    <span className="font-mono font-bold text-sm text-white break-all">
-                      {showSecretKey ? activeMerchant.secret_key : '••••••••••••••••••••••••••••••••••••••••••••••••'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowSecretKey(!showSecretKey)}
-                      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition"
-                      title={showSecretKey ? 'Hide Secret' : 'Reveal Secret'}
-                    >
-                      {showSecretKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={() => copyToClipboard(activeMerchant.secret_key, 'sec_tab')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-white/80 transition"
-                    >
-                      {copiedKey === 'sec_tab' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                      <span>Copy Key</span>
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Quick Integration Snippets */}
-            <div className="p-6 rounded-3xl bg-[#12141c] border border-white/10">
-              <h3 className="font-bold text-sm text-white mb-2">Checkout Initiation Code Snippet</h3>
-              <p className="text-xs text-white/60 mb-4">
-                Redirect customers from your website to Ocubyte Gateway with your merchant credentials:
-              </p>
-
-              <pre className="p-4 rounded-2xl bg-black/60 border border-white/5 text-[11px] font-mono text-[#3ecf8e] overflow-x-auto leading-relaxed">
-{`// Redirect your customer to Ocubyte Hosted Gateway
-const checkoutUrl = new URL("https://www.ocubyte.org/pay");
-checkoutUrl.searchParams.set("merchant_code", "${activeMerchant.merchant_code}");
-checkoutUrl.searchParams.set("amount", "25000"); // NGN
-checkoutUrl.searchParams.set("email", customer.email);
-checkoutUrl.searchParams.set("name", customer.name);
-checkoutUrl.searchParams.set("reference", "ORDER_" + Date.now());
-checkoutUrl.searchParams.set("callback_url", "https://yourwebsite.com/payment/callback");
-
-// Send user to Ocubyte
-window.location.href = checkoutUrl.toString();`}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 5: REGISTER NEW BUSINESS */}
-        {activeTab === 'register' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="p-8 rounded-3xl bg-[#12141c] border border-white/10 shadow-2xl">
-              <div className="text-center mb-6">
-                <div className="h-12 w-12 rounded-2xl bg-[#3ecf8e]/10 text-[#3ecf8e] flex items-center justify-center mx-auto mb-3">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <h2 className="text-2xl font-extrabold text-white">Register Your Business on Ocubyte</h2>
-                <p className="text-xs text-white/60 mt-1">
-                  Start receiving customer payments like on Remita and get automated manual bank payouts.
-                </p>
               </div>
 
-              {regSuccess ? (
-                <div className="p-6 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto mb-3" />
-                  <h3 className="text-lg font-bold text-white">Business Registered Successfully!</h3>
-                  <p className="text-xs text-emerald-300 mt-1">
-                    Your merchant account is now active with merchant code: <code className="font-mono font-bold">{regSuccess.merchant_code}</code>
-                  </p>
+              {/* Secret Key */}
+              <div>
+                <label className="block text-xs font-semibold text-text/80 mb-1">
+                  Secret API Key (Server-Side Strictly Protected)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type={showSecretKey ? 'text' : 'password'}
+                    readOnly
+                    value={activeMerchant?.secret_key || ''}
+                    className="flex-1 px-4 py-2.5 bg-secondary/80 border border-slate-800 rounded-xl text-text font-mono text-xs focus:outline-none"
+                  />
                   <button
-                    onClick={() => {
-                      setRegSuccess(null);
-                      setActiveTab('overview');
-                    }}
-                    className="mt-6 py-2.5 px-6 bg-[#3ecf8e] text-black font-extrabold text-xs rounded-xl shadow-lg"
+                    onClick={() => setShowSecretKey(!showSecretKey)}
+                    className="p-2.5 rounded-xl border border-slate-700 hover:border-accent text-text transition"
+                    title={showSecretKey ? 'Hide Secret Key' : 'Reveal Secret Key'}
                   >
-                    Go to Merchant Dashboard
+                    {showSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(activeMerchant?.secret_key, 'sec')}
+                    className="p-2.5 rounded-xl border border-slate-700 hover:border-accent text-text transition"
+                    title="Copy Secret Key"
+                  >
+                    {copiedKey === 'sec' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-              ) : (
-                <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-mono uppercase text-white/60 mb-1">Business / Entity Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Apex Logistics Ltd, Oha Bu Enyi Age Grade"
-                      value={regForm.business_name}
-                      onChange={(e) => setRegForm({ ...regForm, business_name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-[#3ecf8e]"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-mono uppercase text-white/60 mb-1">Official Business Email *</label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="billing@yourcompany.com"
-                        value={regForm.email}
-                        onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-[#3ecf8e]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono uppercase text-white/60 mb-1">Contact Phone</label>
-                      <input
-                        type="tel"
-                        placeholder="+234 800 000 0000"
-                        value={regForm.phone}
-                        onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-[#3ecf8e]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-white/10">
-                    <span className="text-xs font-mono text-[#3ecf8e] uppercase tracking-wider block mb-3">
-                      Settlement Bank Account Details (Where your money will be transferred)
-                    </span>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-mono uppercase text-white/60 mb-1">Bank Name *</label>
-                        <select
-                          value={regForm.bank_name}
-                          onChange={(e) => setRegForm({ ...regForm, bank_name: e.target.value })}
-                          className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-[#3ecf8e]"
-                        >
-                          {NIGERIAN_BANKS.map((b) => (
-                            <option key={b} value={b} className="bg-[#12141c] text-white">
-                              {b}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-mono uppercase text-white/60 mb-1">10-Digit Account Number *</label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={10}
-                            placeholder="0123456789"
-                            value={regForm.account_number}
-                            onChange={(e) => setRegForm({ ...regForm, account_number: e.target.value.replace(/\D/g, '') })}
-                            className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-[#3ecf8e]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-mono uppercase text-white/60 mb-1">Account Holder Name *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Exact name on bank account"
-                            value={regForm.account_name}
-                            onChange={(e) => setRegForm({ ...regForm, account_name: e.target.value })}
-                            className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-[#3ecf8e]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={regSubmitting}
-                    className="mt-6 w-full py-3.5 px-4 bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-black font-extrabold text-sm rounded-xl shadow-lg shadow-[#3ecf8e]/20 flex items-center justify-center gap-2 transition disabled:opacity-50"
-                  >
-                    {regSubmitting ? (
-                      <>
-                        <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        Generating Keys & Registering...
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="h-4 w-4" />
-                        Create Merchant Gateway Account
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
+              </div>
             </div>
           </div>
         )}
 
       </div>
 
-      {/* WITHDRAWAL REQUEST MODAL */}
+      {/* MODAL 1: REQUEST WITHDRAWAL */}
       <AnimatePresence>
-        {withdrawModalOpen && activeMerchant && (
+        {withdrawModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-[#12141c] border border-white/10 shadow-2xl relative"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg bg-[#090d16] border border-slate-800 rounded-3xl p-6 sm:p-8 text-text shadow-2xl relative"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
-                <div className="flex items-center gap-2 text-sm font-bold text-white">
-                  <ArrowUpRight className="h-5 w-5 text-[#3ecf8e]" />
-                  <span>Request Bank Settlement</span>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0">
+                  <Landmark className="w-5 h-5 text-accent" />
                 </div>
-                <button
-                  onClick={() => {
-                    setWithdrawModalOpen(false);
-                    setWithdrawSuccessData(null);
-                  }}
-                  className="text-white/40 hover:text-white text-sm"
-                >
-                  ✕
-                </button>
+                <div>
+                  <h3 className="text-lg font-bold">Request Bank Withdrawal</h3>
+                  <p className="text-xs text-muted">Sent to Ocubyte Finance for live bank transfer</p>
+                </div>
               </div>
 
-              {withdrawSuccessData ? (
-                <div className="text-center py-4">
-                  <div className="h-16 w-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
-                    ✓
-                  </div>
-                  <h3 className="text-xl font-bold text-white">Withdrawal Request Dispatched!</h3>
-                  <p className="text-xs text-white/70 mt-2 max-w-md mx-auto">
-                    Reference: <code className="font-mono text-[#3ecf8e] font-bold">{withdrawSuccessData.reference}</code>
-                  </p>
-                  <p className="text-xs text-white/60 mt-2">
-                    An email alert has been sent to Ocubyte Finance Desk. An authorized human officer will execute the bank transfer of <strong className="text-white">₦{Number(withdrawSuccessData.net_payout || requestedNum - 50).toLocaleString()}</strong> to your {activeMerchant.bank_name} account.
-                  </p>
-
-                  <button
-                    onClick={() => {
-                      setWithdrawModalOpen(false);
-                      setWithdrawSuccessData(null);
-                    }}
-                    className="mt-6 w-full py-3 bg-[#3ecf8e] text-black font-bold text-xs rounded-xl shadow-lg"
-                  >
-                    Done
-                  </button>
+              {/* Settlement Bank Reminder */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 mb-6 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted">Available Balance:</span>
+                  <span className="font-bold text-emerald-400">
+                    ₦{Number(activeMerchant?.wallet_balance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-              ) : (
-                <form onSubmit={handleWithdrawSubmit} className="space-y-4">
-                  
-                  {/* Current Balance Bar */}
-                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
-                    <span className="text-xs text-white/60 font-mono">Available Balance:</span>
-                    <span className="font-mono font-bold text-sm text-[#3ecf8e]">
-                      ₦{Number(activeMerchant.wallet_balance || 0).toLocaleString()}
-                    </span>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Destination Bank:</span>
+                  <span className="font-semibold text-text">{activeMerchant?.bank_name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted">NUBAN Account:</span>
+                  <span className="font-mono font-bold text-amber-300">{activeMerchant?.account_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Beneficiary Name:</span>
+                  <span className="font-semibold text-text">{activeMerchant?.account_name}</span>
+                </div>
+              </div>
 
-                  {/* Destination Account */}
-                  <div className="p-3.5 rounded-2xl bg-black/40 border border-white/5 space-y-1">
-                    <span className="text-[10px] font-mono text-white/40 uppercase block">Destination Bank Account</span>
-                    <div className="font-bold text-xs text-white">{activeMerchant.bank_name} - {activeMerchant.account_number}</div>
-                    <div className="text-[11px] text-white/60">{activeMerchant.account_name}</div>
-                  </div>
-
-                  {/* Amount Input */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase text-white/60 mb-1">Withdrawal Amount (₦) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      max={activeMerchant.wallet_balance}
-                      placeholder="e.g. 50000"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-base font-bold focus:outline-none focus:border-[#3ecf8e]"
-                    />
-                    
-                    {/* Percentage Buttons */}
-                    <div className="flex gap-2 mt-2">
-                      {[0.25, 0.5, 0.75, 1.0].map((pct) => (
-                        <button
-                          key={pct}
-                          type="button"
-                          onClick={() => setWithdrawAmount(String(Math.floor(activeMerchant.wallet_balance * pct)))}
-                          className="flex-1 py-1 rounded bg-white/5 hover:bg-white/10 text-[11px] font-mono text-white/70"
-                        >
-                          {pct * 100}%
-                        </button>
-                      ))}
+              <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-text/80 mb-1.5">
+                    Amount to Withdraw (₦) <span className="text-accent">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="100"
+                    max={activeMerchant?.wallet_balance || 0}
+                    required
+                    placeholder="e.g. 50000"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary/80 border border-slate-800 rounded-xl text-text font-mono text-sm focus:outline-none focus:border-accent"
+                  />
+                  {withdrawAmount > 0 && (
+                    <div className="text-[11px] text-muted mt-1.5 flex justify-between">
+                      <span>Net Transfer to Receive:</span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        ₦{Math.max(0, withdrawAmount - 50).toLocaleString()} (after ₦50 transfer fee)
+                      </span>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Financial Breakdown */}
-                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 space-y-2 text-xs">
-                    <div className="flex justify-between text-white/60">
-                      <span>Requested Amount:</span>
-                      <span className="font-mono text-white">₦{requestedNum.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-white/60">
-                      <span>NIP Transfer Fee:</span>
-                      <span className="font-mono text-white">₦{transferFee.toFixed(2)}</span>
-                    </div>
-                    <div className="pt-2 border-t border-white/10 flex justify-between font-bold text-sm">
-                      <span className="text-white">Net Payout to Bank:</span>
-                      <span className="font-mono text-[#3ecf8e]">₦{netPayoutAmount.toLocaleString()}</span>
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-text/80 mb-1.5">
+                    Notes for Finance Team (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Batch disbursement for vendor payroll"
+                    value={withdrawNotes}
+                    onChange={(e) => setWithdrawNotes(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary/80 border border-slate-800 rounded-xl text-text text-xs focus:outline-none focus:border-accent"
+                  />
+                </div>
 
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase text-white/60 mb-1">Notes for Finance Officer (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Urgent dues settlement for October"
-                      value={withdrawNotes}
-                      onChange={(e) => setWithdrawNotes(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-[#3ecf8e]"
-                    />
-                  </div>
-
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                   <button
-                    type="submit"
-                    disabled={isSubmittingWithdraw || requestedNum <= transferFee || requestedNum > activeMerchant.wallet_balance}
-                    className="w-full py-3.5 bg-[#3ecf8e] hover:bg-[#3ecf8e]/90 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-[#3ecf8e]/20 flex items-center justify-center gap-2 transition disabled:opacity-40"
+                    type="button"
+                    onClick={() => setWithdrawModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-700 text-muted hover:text-text text-xs font-semibold"
                   >
-                    {isSubmittingWithdraw ? (
-                      <>
-                        <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        Transmitting Request to Ocubyte Finance...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        Confirm & Submit Withdrawal Request
-                      </>
-                    )}
+                    Cancel
                   </button>
-                </form>
-              )}
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={isSubmittingWithdraw}
+                    className="py-2.5 px-5 text-xs font-bold"
+                  >
+                    {isSubmittingWithdraw ? 'Submitting Request...' : 'Confirm & Request Payout'}
+                  </Button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* GENERATE PAYMENT LINK MODAL */}
+      {/* MODAL 2: GENERATE PAYMENT LINK WITH MRN */}
       <AnimatePresence>
         {linkModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-[#12141c] border border-white/10 shadow-2xl"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg bg-[#090d16] border border-slate-800 rounded-3xl p-6 sm:p-8 text-text shadow-2xl relative"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
-                <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4 text-[#3ecf8e]" />
-                  Instant Payment Link
-                </h3>
-                <button onClick={() => setLinkModalOpen(false)} className="text-white/40 hover:text-white">✕</button>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <Link2 className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Generate Customer Payment Link</h3>
+                  <p className="text-xs text-muted">Pre-filled with an official Merchant Reference Number (MRN)</p>
+                </div>
               </div>
 
-              <div className="space-y-4">
+              <form onSubmit={handleGenerateLink} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-white/60 mb-1">Invoice / Payment Description</label>
+                  <label className="block text-xs font-semibold text-text/80 mb-1.5">
+                    Invoice Title / Purpose
+                  </label>
                   <input
                     type="text"
+                    required
+                    placeholder="e.g. Annual Dues 2026 or Medical Supplies"
                     value={linkTitle}
                     onChange={(e) => setLinkTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs"
+                    className="w-full px-4 py-2.5 bg-secondary/80 border border-slate-800 rounded-xl text-text text-xs focus:outline-none focus:border-accent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-white/60 mb-1">Amount (₦)</label>
+                  <label className="block text-xs font-semibold text-text/80 mb-1.5">
+                    Amount (₦)
+                  </label>
                   <input
                     type="number"
+                    min="100"
+                    required
+                    placeholder="10000"
                     value={linkAmount}
-                    onChange={(e) => setLinkAmount(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-sm"
+                    onChange={(e) => setLinkAmount(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary/80 border border-slate-800 rounded-xl text-text font-mono text-xs focus:outline-none focus:border-accent"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-white/60 mb-1">Shareable Customer Checkout URL</label>
-                  <div className="p-3 rounded-xl bg-black/60 border border-white/10 font-mono text-xs text-[#3ecf8e] break-all">
-                    {typeof window !== 'undefined' ? window.location.origin : 'https://www.ocubyte.org'}/pay?merchant_code={activeMerchant?.merchant_code}&amount={linkAmount}&description={encodeURIComponent(linkTitle)}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    const link = `${typeof window !== 'undefined' ? window.location.origin : 'https://www.ocubyte.org'}/pay?merchant_code=${activeMerchant?.merchant_code}&amount=${linkAmount}&description=${encodeURIComponent(linkTitle)}`;
-                    copyToClipboard(link, 'modal_link');
-                  }}
-                  className="w-full py-3 bg-[#3ecf8e] text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2"
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full py-2.5 text-xs font-bold"
                 >
-                  {copiedKey === 'modal_link' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copiedKey === 'modal_link' ? 'Copied to Clipboard!' : 'Copy Payment Link'}
+                  Generate Shareable Link with MRN
+                </Button>
+              </form>
+
+              {generatedLink && (
+                <div className="mt-6 p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                  <div className="text-[11px] font-bold text-accent">Customer Link Ready:</div>
+                  <div className="p-2.5 rounded-xl bg-slate-950 font-mono text-[11px] text-text/90 break-all border border-slate-800">
+                    {generatedLink}
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(generatedLink, 'link')}
+                    className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-text font-bold text-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    {copiedKey === 'link' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedKey === 'link' ? 'Copied to Clipboard!' : 'Copy Payment Link'}</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4 mt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setLinkModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-700 text-muted hover:text-text text-xs font-semibold"
+                >
+                  Close
                 </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }
