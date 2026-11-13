@@ -2,83 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  CreditCard, 
   ShieldCheck, 
-  Zap, 
   Receipt, 
   Lock, 
-  ArrowRight, 
   CheckCircle2, 
   Sparkles, 
   Key, 
-  History, 
   Building2, 
-  ExternalLink,
-  Users,
-  Check,
-  AlertTriangle,
-  Clock,
-  ArrowLeft,
-  RefreshCw,
-  Copy,
-  UserCheck,
-  FileText
+  Check, 
+  RefreshCw, 
+  Copy, 
+  UserCheck, 
+  Zap 
 } from 'lucide-react';
 import { 
   initializePaystackPayment, 
   simulatePaymentSuccess, 
   formatCurrency, 
   getPaystackPublicKey, 
-  setPaystackPublicKey, 
-  resetPaystackPublicKey,
   getRecordedTransactions,
   generateReference
 } from '../utils/paystack';
-import Button from '../components/Button';
 import PaymentReceipt from '../components/PaymentReceipt';
 import { 
   getPublicMerchantsSummary, 
   getMerchantByCode, 
   creditMerchantPayment 
 } from '../lib/supabase';
-
-const SERVICE_PACKAGES = [
-  {
-    id: 'custom',
-    name: 'Custom Invoice / Amount',
-    desc: 'Pay for an agreed project milestone or custom invoice',
-    defaultAmount: 50000,
-    icon: '⚡'
-  },
-  {
-    id: 'brand',
-    name: 'Brand Identity & Design',
-    desc: 'Logo suite, brand guidelines, typography and color palettes',
-    defaultAmount: 75000,
-    icon: '🎨'
-  },
-  {
-    id: 'web',
-    name: 'Custom Web Application',
-    desc: 'High-performance React/Vite web application development deposit',
-    defaultAmount: 250000,
-    icon: '💻'
-  },
-  {
-    id: 'automation',
-    name: 'Automation & Integration Suite',
-    desc: 'Workflow automations, CRM synchronization, custom API pipelines',
-    defaultAmount: 150000,
-    icon: '🤖'
-  },
-  {
-    id: 'retainer',
-    name: 'Monthly Studio Retainer',
-    desc: 'Continuous dedicated engineering and UI/UX maintenance',
-    defaultAmount: 100000,
-    icon: '🚀'
-  }
-];
 
 // Helper to generate official Merchant Reference Number (MRN)
 function generateMRN(merchantCode = 'MCH') {
@@ -96,22 +46,20 @@ const PayPage = () => {
   const paramAmount = searchParams.get('amount');
   const paramCurrency = (searchParams.get('currency') || 'NGN').toUpperCase();
   const paramEmail = searchParams.get('email');
-  const paramName = searchParams.get('name');
+  const paramName = searchParams.get('name') || searchParams.get('customer_name');
   const paramPurpose = searchParams.get('purpose');
   const paramCallbackUrl = searchParams.get('callback_url');
   const paramSignature = searchParams.get('signature');
   const paramApp = searchParams.get('app');
   const paramUserId = searchParams.get('userId') || searchParams.get('user_id');
-  const paramDueIds = searchParams.get('due_ids');
   const paramDescription = searchParams.get('description');
   const paramMerchantCode = searchParams.get('merchant_code') || searchParams.get('merchant_id');
 
   const isObeagSession = (paramApp === 'obeag' || paramPurpose || paramRef?.startsWith('OCUBYTE_') || paramMerchantCode === 'obeag_portal') && !!paramRef && !!paramAmount;
+  const isThirdPartyPayment = isObeagSession || paramApp === 'obeag' || paramMerchantCode === 'obeag_portal' || (!!paramMerchantCode && !!paramAmount);
 
   // Payment Mode: 'merchant_mrn' vs 'ocubyte_agency'
-  const [payMode, setPayMode] = useState(
-    paramMerchantCode || isObeagSession ? 'merchant_mrn' : 'merchant_mrn'
-  );
+  const [payMode, setPayMode] = useState('merchant_mrn');
 
   // Merchant List & Selection
   const [publicMerchants, setPublicMerchants] = useState([]);
@@ -125,8 +73,7 @@ const PayPage = () => {
   const [copiedMRN, setCopiedMRN] = useState(false);
 
   // Form State
-  const [selectedService, setSelectedService] = useState('custom');
-  const [currency, setCurrency] = useState(paramCurrency);
+  const [currency] = useState(paramCurrency);
   const [amount, setAmount] = useState(paramAmount ? Number(paramAmount) : 25000);
   const [clientName, setClientName] = useState(paramName || '');
   const [email, setEmail] = useState(paramEmail || '');
@@ -134,23 +81,18 @@ const PayPage = () => {
   const [purposeDescription, setPurposeDescription] = useState(paramDescription || paramPurpose || 'Merchant Payment');
 
   // Security / verification state
-  const [sigValidation, setSigValidation] = useState({ checked: false, valid: true });
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedTx, setCompletedTx] = useState(null);
   const [callbackRedirectUrl, setCallbackRedirectUrl] = useState(null);
   const [countdown, setCountdown] = useState(5);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [customKeyInput, setCustomKeyInput] = useState('');
   const [activeKey, setActiveKey] = useState('');
-  const [recentTransactions, setRecentTransactions] = useState([]);
 
-  // Load public merchants safely (NO bank accounts, NO balances exposed)
+  // Load public merchants safely
   useEffect(() => {
     getPublicMerchantsSummary().then((list) => {
       setPublicMerchants(list || []);
       if (list && list.length > 0 && !paramMerchantCode) {
-        // default to first merchant or obeag
         const defaultMch = list.find(m => m.merchant_code === 'obeag_portal') || list[0];
         setSelectedMerchantCode(defaultMch.merchant_code);
       }
@@ -162,7 +104,6 @@ const PayPage = () => {
     if (selectedMerchantCode && !paramRef) {
       setMrnNumber(generateMRN(selectedMerchantCode));
     }
-    // Fetch merchant details (safe info)
     if (selectedMerchantCode) {
       getMerchantByCode(selectedMerchantCode).then((m) => {
         setSelectedMerchantDetails(m);
@@ -172,7 +113,6 @@ const PayPage = () => {
 
   useEffect(() => {
     setActiveKey(getPaystackPublicKey());
-    setRecentTransactions(getRecordedTransactions().filter(t => t.merchantId === 'ocubyte_direct' || t.merchantId === 'obeag_portal'));
 
     // Check Obeag HMAC SHA-256 signature if session is active
     if (isObeagSession && paramSignature) {
@@ -188,16 +128,9 @@ const PayPage = () => {
           email: paramEmail,
           signature: paramSignature
         })
-      })
-      .then(res => res.json())
-      .then(data => {
-        setSigValidation({ checked: true, valid: data.valid !== false });
-      })
-      .catch(() => {
-        setSigValidation({ checked: true, valid: true });
-      });
+      }).catch(() => {});
     }
-  }, [isObeagSession, paramRef, paramAmount, paramSignature]);
+  }, [isObeagSession, paramRef, paramAmount, paramSignature, paramEmail, paramPurpose, paramUserId]);
 
   const handleCopyMRN = () => {
     navigator.clipboard.writeText(mrnNumber);
@@ -247,22 +180,26 @@ const PayPage = () => {
 
   const handlePaymentSuccess = async (tx) => {
     setIsProcessing(false);
+    const payingToName = selectedMerchantDetails?.business_name || (selectedMerchantCode === 'obeag_portal' || isObeagSession || paramApp === 'obeag' ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Merchant Payment');
+    
     setCompletedTx({
       ...tx,
       reference: mrnNumber || tx.reference,
-      merchantName: selectedMerchantDetails?.business_name || (isObeagSession ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Ocubyte Software')
+      merchantName: payingToName
     });
-    setRecentTransactions(getRecordedTransactions());
 
-    // Synchronize payment into Supabase and credit merchant's wallet atomically
     const targetMerchantId = selectedMerchantDetails?.id || selectedMerchantCode || (isObeagSession ? 'obeag_portal' : 'ocubyte_direct');
+    const cleanName = (clientName || '').trim();
+    const fallbackEmail = `${(cleanName || 'payer').toLowerCase().replace(/[^a-z0-9]/g, '') || 'member'}@${isObeagSession || selectedMerchantCode === 'obeag_portal' ? 'ohabuenyi.org' : 'ocubyte.org'}`;
+    const effectiveEmail = (email && email.includes('@')) ? email.trim() : fallbackEmail;
+
     try {
       await creditMerchantPayment({
         merchantId: targetMerchantId,
         amount: Number(amount),
         reference: mrnNumber || tx.reference,
-        customerName: clientName || 'Verified Customer',
-        customerEmail: email,
+        customerName: cleanName || 'Verified Payer',
+        customerEmail: effectiveEmail,
         customerPhone: phone,
         purpose: purposeDescription,
         channel: tx.channel || 'paystack_inline',
@@ -281,7 +218,6 @@ const PayPage = () => {
       const finalUrl = await buildObeagCallbackUrl('success');
       setCallbackRedirectUrl(finalUrl);
 
-      // Auto countdown 5 seconds to return to Obeag
       let count = 5;
       const timer = setInterval(() => {
         count -= 1;
@@ -297,28 +233,28 @@ const PayPage = () => {
   };
 
   const handleDirectPayment = async (isSandbox = false) => {
-    if (!email || !email.includes('@')) {
-      alert('Please enter a valid customer email address.');
-      return;
-    }
+    const cleanName = (clientName || '').trim();
+    const fallbackEmail = `${(cleanName || 'payer').toLowerCase().replace(/[^a-z0-9]/g, '') || 'member'}@${isObeagSession || selectedMerchantCode === 'obeag_portal' ? 'ohabuenyi.org' : 'ocubyte.org'}`;
+    const effectiveEmail = (email && email.includes('@')) ? email.trim() : fallbackEmail;
+
     if (!amount || Number(amount) <= 0) {
       alert('Please enter a valid payment amount.');
       return;
     }
 
     const currentRef = mrnNumber || paramRef || generateReference('MRN');
-    const targetMerchantName = selectedMerchantDetails?.business_name || (isObeagSession ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Ocubyte Studio');
+    const targetMerchantName = selectedMerchantDetails?.business_name || (isObeagSession || selectedMerchantCode === 'obeag_portal' ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Ocubyte Studio');
 
     setIsProcessing(true);
 
     if (isSandbox) {
       setTimeout(async () => {
         const tx = simulatePaymentSuccess({
-          email,
+          email: effectiveEmail,
           amount,
           currency,
           reference: currentRef,
-          customerName: clientName || 'Verified Customer',
+          customerName: cleanName || 'Verified Payer',
           merchantId: selectedMerchantCode,
           merchantName: targetMerchantName
         });
@@ -329,11 +265,11 @@ const PayPage = () => {
 
     try {
       await initializePaystackPayment({
-        email,
+        email: effectiveEmail,
         amount: Number(amount),
         currency,
         reference: currentRef,
-        customerName: clientName || 'Customer',
+        customerName: cleanName || 'Payer',
         merchantId: selectedMerchantCode,
         merchantName: targetMerchantName,
         metadata: {
@@ -341,7 +277,7 @@ const PayPage = () => {
           mrn: currentRef,
           merchant_code: selectedMerchantCode,
           purpose: purposeDescription,
-          customer_name: clientName,
+          customer_name: cleanName,
           customer_phone: phone
         },
         onSuccess: async (tx) => {
@@ -361,6 +297,103 @@ const PayPage = () => {
     }
   };
 
+  // Simplified Third-Party Payment View (e.g. Ohabuenyi Age Grade)
+  if (isThirdPartyPayment) {
+    const payingToName = selectedMerchantDetails?.business_name || (selectedMerchantCode === 'obeag_portal' || isObeagSession || paramApp === 'obeag' ? 'OHA BU ENYI AGE GRADE (OBEAG)' : 'Merchant');
+
+    return (
+      <div className="w-full max-w-md mx-auto py-8 px-4 sm:px-6 flex flex-col justify-center items-center">
+        <div className="w-full space-y-6">
+          <AnimatePresence mode="wait">
+            {completedTx ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="space-y-4"
+              >
+                {paramCallbackUrl && (
+                  <div className="bg-accent/15 border border-accent/40 rounded-2xl p-4 text-center space-y-2">
+                    <div className="text-xs font-semibold text-accent flex items-center justify-center gap-2">
+                      <span className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                      <span>Redirecting to {payingToName} in {countdown}s...</span>
+                    </div>
+                  </div>
+                )}
+
+                <PaymentReceipt 
+                  transaction={completedTx} 
+                  onDone={() => setCompletedTx(null)}
+                  returnUrl={callbackRedirectUrl}
+                  returnUrlText={isObeagSession ? 'Return to Portal Now' : 'Make Another Payment'}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-secondary/95 border border-slate-700/80 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6 text-center"
+              >
+                {/* Who they are paying */}
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    Paying to
+                  </span>
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-text tracking-tight">
+                    {payingToName}
+                  </h1>
+                </div>
+
+                {/* Payer's Name */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-semibold text-muted block">
+                    Payer's Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter payer's name"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full bg-primary/60 border border-slate-700 rounded-2xl px-4 py-3 text-sm sm:text-base font-semibold text-text focus:outline-none focus:border-accent transition"
+                  />
+                </div>
+
+                {/* Amount */}
+                <div className="p-5 rounded-2xl bg-primary/50 border border-slate-800 text-center space-y-1">
+                  <span className="text-xs font-semibold text-muted uppercase tracking-wider">
+                    Amount
+                  </span>
+                  <div className="text-3xl sm:text-4xl font-extrabold text-accent font-mono">
+                    {formatCurrency(amount, currency)}
+                  </div>
+                </div>
+
+                {/* The Pay Button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => handleDirectPayment(false)}
+                    className="w-full py-4 px-6 rounded-2xl bg-accent text-primary font-extrabold text-base hover:brightness-110 active:scale-[0.99] transition shadow-lg shadow-accent/25 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isProcessing ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        Processing Payment...
+                      </span>
+                    ) : (
+                      <span>Pay {formatCurrency(amount, currency)}</span>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
+  // Direct In-App Payment Portal (when accessed directly without third-party integration parameters)
   return (
     <div className="container mx-auto px-4 sm:px-6 py-12 max-w-6xl space-y-10">
       
@@ -406,20 +439,11 @@ const PayPage = () => {
       <AnimatePresence mode="wait">
         {completedTx ? (
           <div className="py-6 space-y-4">
-            {paramCallbackUrl && (
-              <div className="max-w-lg mx-auto bg-blue-950/40 border border-blue-800/60 rounded-2xl p-4 text-center space-y-2">
-                <div className="text-xs font-semibold text-blue-300 flex items-center justify-center gap-2">
-                  <span className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  <span>Redirecting to Obeag Portal in {countdown}s...</span>
-                </div>
-              </div>
-            )}
-
             <PaymentReceipt 
               transaction={completedTx} 
               onDone={() => setCompletedTx(null)}
               returnUrl={callbackRedirectUrl}
-              returnUrlText={isObeagSession ? 'Return to Obeag Portal Now' : 'Make Another Payment'}
+              returnUrlText="Make Another Payment"
             />
           </div>
         ) : (
@@ -429,34 +453,32 @@ const PayPage = () => {
             <div className="lg:col-span-7 space-y-6">
 
               {/* Mode Toggle: Pay a Merchant (MRN) vs Agency Services */}
-              {!isObeagSession && (
-                <div className="grid grid-cols-2 p-1 bg-slate-900/90 border border-slate-800 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => setPayMode('merchant_mrn')}
-                    className={`py-3 text-xs sm:text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 ${
-                      payMode === 'merchant_mrn'
-                        ? 'bg-accent text-primary shadow-md'
-                        : 'text-text/70 hover:text-text'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4" />
-                    <span>Pay a Merchant (MRN)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPayMode('ocubyte_agency')}
-                    className={`py-3 text-xs sm:text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 ${
-                      payMode === 'ocubyte_agency'
-                        ? 'bg-accent text-primary shadow-md'
-                        : 'text-text/70 hover:text-text'
-                    }`}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Ocubyte Agency Services</span>
-                  </button>
-                </div>
-              )}
+              <div className="grid grid-cols-2 p-1 bg-slate-900/90 border border-slate-800 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setPayMode('merchant_mrn')}
+                  className={`py-3 text-xs sm:text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 ${
+                    payMode === 'merchant_mrn'
+                      ? 'bg-accent text-primary shadow-md'
+                      : 'text-text/70 hover:text-text'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span>Pay a Merchant (MRN)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayMode('ocubyte_agency')}
+                  className={`py-3 text-xs sm:text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 ${
+                    payMode === 'ocubyte_agency'
+                      ? 'bg-accent text-primary shadow-md'
+                      : 'text-text/70 hover:text-text'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Ocubyte Agency Services</span>
+                </button>
+              </div>
 
               {/* SECTION: MRN GENERATOR BOX */}
               {payMode === 'merchant_mrn' && (
